@@ -4,7 +4,12 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
+from .database import Base, engine
 from .routes import cards, cardmarket, scan, settings, setup
+
+# Create tables if they don't exist (first-time setup)
+from . import models  # noqa: ensure models are registered
+Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="YugiPy", version="1.0.0")
 
