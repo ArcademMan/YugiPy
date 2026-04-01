@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue" alt="Platform">
+  <img src="https://img.shields.io/badge/platform-Windows-blue" alt="Platform">
   <img src="https://img.shields.io/badge/python-3.12+-yellow" alt="Python">
   <img src="https://img.shields.io/badge/backend-FastAPI-green" alt="Backend">
   <img src="https://img.shields.io/badge/license-MIT-lightgrey" alt="License">
@@ -59,21 +59,10 @@ Open your browser at the address shown in the terminal.
 
 ## Firefox Extension
 
-YugiPy includes a Firefox extension for syncing prices from Cardmarket.
+YugiPy includes a Firefox extension for syncing prices from Cardmarket. The `.xpi` file is bundled with the application.
 
-### Install from source (temporary)
-
-1. Open `about:debugging#/runtime/this-firefox` in Firefox
-2. Click "Load Temporary Add-on"
-3. Select `extension/manifest.json`
-
-### Install signed version
-
-1. Build the zip: the extension files are in `extension/`
-2. Upload to [addons.mozilla.org](https://addons.mozilla.org/developers/) for self-distribution signing
-3. Install the signed `.xpi` in Firefox
-
-The connection status is shown as a dot in the navigation bar (green = connected, red = disconnected).
+1. Open the install folder and drag `yugipy-extension.xpi` into a Firefox window
+2. The connection status is shown as a dot in the navigation bar (green = connected, red = disconnected)
 
 ## Architecture
 
