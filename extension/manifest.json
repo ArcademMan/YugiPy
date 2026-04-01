@@ -1,0 +1,35 @@
+{
+  "manifest_version": 2,
+  "name": "YugiPy Price Sync",
+  "version": "1.1",
+  "description": "Syncs Yu-Gi-Oh card prices from Cardmarket to YugiPy.",
+  "permissions": [
+    "tabs",
+    "activeTab",
+    "*://www.cardmarket.com/*"
+  ],
+  "background": {
+    "scripts": ["background.js"],
+    "persistent": true
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://www.cardmarket.com/*/YuGiOh/Products/Singles/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "48": "icon-48.png",
+    "96": "icon-96.png",
+    "128": "icon-128.png"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "yugipy-scraper@riccardo",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  }
+}

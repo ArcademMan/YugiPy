@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YugiPy</title>
+    <link rel="stylesheet" href="/css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+
+    <!-- Navigation -->
+    <nav class="bottom-nav">
+        <div class="nav-brand">
+            <img src="/assets/icon.png" alt="YugiPy" class="header-logo">
+            <span class="header-title">YugiPy</span>
+        </div>
+        <div class="nav-buttons">
+            <button class="nav-btn active" data-view="collection">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                <span>Collection</span>
+            </button>
+            <button class="nav-btn" data-view="scanner">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <span>Scanner</span>
+            </button>
+            <button class="nav-btn" data-view="book">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/></svg>
+                <span>Book</span>
+            </button>
+            <button class="nav-btn" data-view="settings">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+                <span>Settings</span>
+            </button>
+        </div>
+        <button id="ext-status-btn" class="ext-status-dot disconnected" title="Extension: disconnected"></button>
+    </nav>
+
+    <main>
+        <!-- ==================== COLLECTION ==================== -->
+        <section id="view-collection" class="view active">
+            <div class="page-header">
+                <h1>My Collection</h1>
+                <div id="collection-stats" class="stats-badge"></div>
+            </div>
+
+            <div class="search-bar">
+                <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                <input type="text" id="search-input" placeholder="Filter by name or set code...">
+            </div>
+
+            <div class="filter-bar">
+                <select id="sort-select">
+                    <option value="price-desc">Price ↓</option>
+                    <option value="price-asc">Price ↑</option>
+                    <option value="name-asc">Name A-Z</option>
+                    <option value="name-desc">Name Z-A</option>
+                    <option value="qty-desc">Quantity ↓</option>
+                    <option value="id-desc">Newest</option>
+                    <option value="id-asc">Oldest</option>
+                </select>
+                <select id="filter-rarity"><option value="">All rarities</option></select>
+                <select id="filter-condition">
+                    <option value="">All conditions</option>
+                    <option value="Mint">Mint</option>
+                    <option value="Near Mint">Near Mint</option>
+                    <option value="Excellent">Excellent</option>
+                    <option value="Good">Good</option>
+                    <option value="Light Played">Light Played</option>
+                    <option value="Played">Played</option>
+                    <option value="Poor">Poor</option>
+                </select>
+                <select id="filter-lang">
+                    <option value="">All languages</option>
+                    <option value="IT">Italian</option>
+                    <option value="EN">English</option>
+                    <option value="FR">French</option>
+                    <option value="DE">German</option>
+                    <option value="ES">Spanish</option>
+                    <option value="PT">Portuguese</option>
+                    <option value="JA">Japanese</option>
+                    <option value="KO">Korean</option>
+                </select>
+            </div>
+
+            <div id="card-grid" class="card-grid"></div>
+
+            <button id="add-new-btn" class="fab" title="Add card manually">+</button>
+
+            <div id="empty-state" class="empty-state" hidden>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><rect x="2" y="3" width="20" height="18" rx="2"/><path d="M8 7h8M8 11h5"/></svg>
+                <h3>No cards</h3>
+                <p>Use the scanner to add your cards to the collection</p>
+            </div>
+        </section>
+
+        <!-- ==================== SCANNER ==================== -->
+        <section id="view-scanner" class="view">
+            <div class="page-header">
+                <h1>Scanner</h1>
+            </div>
+
+            <div id="camera-container">
+                <video id="camera-feed" autoplay playsinline></video>
+                <div id="camera-overlay"></div>
+            </div>
+
+            <div id="ocr-live-preview" class="ocr-live-preview" hidden>
+                <div class="ocr-live-zone">
+                    <span class="zone-dot" id="pv-detect-dot"></span>
+                    <span class="zone-text" id="pv-detect-text">Starting camera...</span>
+                </div>
+                <div class="ocr-live-zone" style="margin-top:4px">
+                    <span class="zone-dot" id="pv-match-dot" style="background:transparent"></span>
+                    <span class="zone-text" id="pv-match-text" style="font-weight:700"></span>
+                    <span id="pv-match-conf" style="font-size:0.8rem;font-weight:600"></span>
+                    <span id="pv-auto-info" style="color:var(--green);font-size:0.7rem;margin-left:4px"></span>
+                </div>
+                <details class="ocr-debug-details" id="preview-debug">
+                    <summary>Debug</summary>
+                    <div id="preview-debug-content">
+                        <img id="pv-dbg-artwork" class="ocr-processed-img detection-debug" alt="Artwork" hidden>
+                        <img id="pv-dbg-warped" class="ocr-processed-img detection-debug" alt="Warped" hidden>
+                        <img id="pv-dbg-detect" class="ocr-processed-img detection-debug" alt="Detection" hidden>
+                        <div id="pv-dbg-setcode" style="margin-top:8px" hidden>
+                            <p style="font-size:0.7rem;color:var(--text-muted)">Set code — raw:</p>
+                            <img id="pv-dbg-setcode-img" style="max-height:40px;width:auto;border:1px solid var(--border);border-radius:4px;background:#fff" alt="Set code raw">
+                            <p style="font-size:0.7rem;color:var(--text-muted);margin-top:4px">Set code — processed (what Tesseract sees):</p>
+                            <img id="pv-dbg-setcode-proc" style="max-height:40px;width:auto;border:1px solid var(--border);border-radius:4px;background:#fff" alt="Set code processed">
+                            <p id="pv-dbg-setcode-text" style="font-size:0.8rem;font-weight:600;margin-top:4px"></p>
+                        </div>
+                    </div>
+                </details>
+            </div>
+
+            <div class="scanner-controls">
+                <span class="rotation-label">Card orientation:</span>
+                <div class="rotation-buttons">
+                    <button class="rot-btn active" data-rot="0" title="Card top facing up">&#x2191;</button>
+                    <button class="rot-btn" data-rot="270" title="Card top facing right">&#x2192;</button>
+                    <button class="rot-btn" data-rot="180" title="Card top facing down">&#x2193;</button>
+                    <button class="rot-btn" data-rot="90" title="Card top facing left">&#x2190;</button>
+                </div>
+            </div>
+
+            <button id="capture-btn" class="btn-primary btn-capture">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="13" r="4"/><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/></svg>
+                Scan
+            </button>
+            <canvas id="capture-canvas" hidden></canvas>
+
+            <div id="scan-loading" class="loading-state" hidden>
+                <div class="spinner"></div>
+                <p>Analyzing...</p>
+            </div>
+        </section>
+
+        <!-- ==================== RESULTS ==================== -->
+        <section id="view-results" class="view">
+            <div class="page-header">
+                <h1>Results</h1>
+                <p id="ocr-text" class="ocr-extracted-text"></p>
+            </div>
+            <div id="results-grid" class="card-grid"></div>
+            <button id="back-to-camera" class="btn-secondary btn-full">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                Scan another
+            </button>
+        </section>
+
+        <!-- ==================== BOOK ==================== -->
+        <section id="view-book" class="view">
+            <div class="page-header">
+                <h1>Book</h1>
+                <span id="book-stats" class="stats-badge"></span>
+            </div>
+
+            <details class="book-settings-panel">
+                <summary>Book Settings</summary>
+                <div class="book-settings-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="book-group-by">Group by</label>
+                            <select id="book-group-by">
+                                <option value="set" selected>Set</option>
+                                <option value="archetype">Archetype</option>
+                                <option value="type">Type</option>
+                                <option value="none">None</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="book-sort-by">Sort by</label>
+                            <select id="book-sort-by">
+                                <option value="rarity" selected>Rarity</option>
+                                <option value="name">Name</option>
+                                <option value="set_code">Set code</option>
+                                <option value="price">Price</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="book-grid-size">Cards per page</label>
+                            <select id="book-grid-size">
+                                <option value="3x3" selected>3×3 (9)</option>
+                                <option value="4x3">4×3 (12)</option>
+                                <option value="4x4">4×4 (16)</option>
+                                <option value="5x4">5×4 (20)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="book-max-copies">Max copies per card</label>
+                            <select id="book-max-copies">
+                                <option value="0">All</option>
+                                <option value="1" selected>1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="book-filter-lang">Language</label>
+                            <select id="book-filter-lang">
+                                <option value="">All</option>
+                                <option value="IT">Italian</option>
+                                <option value="EN">English</option>
+                                <option value="FR">French</option>
+                                <option value="DE">German</option>
+                                <option value="ES">Spanish</option>
+                                <option value="PT">Portuguese</option>
+                                <option value="JA">Japanese</option>
+                                <option value="KO">Korean</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="book-filter-condition">Min condition</label>
+                            <select id="book-filter-condition">
+                                <option value="">All</option>
+                                <option value="Mint">Mint</option>
+                                <option value="Near Mint">Near Mint</option>
+                                <option value="Excellent">Excellent</option>
+                                <option value="Good">Good</option>
+                                <option value="Light Played">Light Played</option>
+                                <option value="Played">Played</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="book-filter-set">Filter set</label>
+                            <select id="book-filter-set">
+                                <option value="">All sets</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="book-min-price">Min price (€)</label>
+                            <input type="number" id="book-min-price" value="0" min="0" step="0.5" style="width:100%">
+                        </div>
+                    </div>
+                    <label class="book-checkbox-label">
+                        <input type="checkbox" id="book-new-page" checked>
+                        Separate groups on new page
+                    </label>
+                    <label class="book-checkbox-label">
+                        <input type="checkbox" id="book-show-prices">
+                        Show prices on cards
+                    </label>
+                </div>
+            </details>
+
+            <div id="book-spread" class="book-spread"></div>
+
+            <div class="book-nav">
+                <button id="book-prev" class="btn-secondary">&larr;</button>
+                <span id="book-page-num"></span>
+                <button id="book-next" class="btn-secondary">&rarr;</button>
+            </div>
+        </section>
+
+        <!-- ==================== SETTINGS ==================== -->
+        <section id="view-settings" class="view">
+            <div class="page-header">
+                <h1>Settings</h1>
+            </div>
+
+            <!-- Setup Wizard -->
+            <div class="settings-card">
+                <div class="settings-card-header">
+                    <h3>Card Index</h3>
+                    <span id="setup-status-badge" class="badge" hidden></span>
+                </div>
+                <div class="settings-card-body">
+                    <div id="setup-status-info">
+                        <p class="text-muted">Loading status...</p>
+                    </div>
+
+                    <div id="setup-wizard" hidden>
+                        <div id="setup-steps" style="margin-bottom:14px">
+                            <div class="setup-step" data-step="1"><span class="step-icon">○</span> Download card database</div>
+                            <div class="setup-step" data-step="2"><span class="step-icon">○</span> Download cropped artworks</div>
+                            <div class="setup-step" data-step="3"><span class="step-icon">○</span> Download full images</div>
+                            <div class="setup-step" data-step="4"><span class="step-icon">○</span> Build hash index</div>
+                        </div>
+                        <div class="progress-bar-container" style="margin-bottom:8px">
+                            <div id="setup-bar" class="progress-bar-fill" style="width:0%"></div>
+                        </div>
+                        <p id="setup-progress-text" class="text-muted" style="font-size:0.85rem"></p>
+                    </div>
+
+                    <div style="display:flex;gap:8px;margin-top:12px">
+                        <button id="setup-run-btn" class="btn-primary" hidden>Configure index</button>
+                        <button id="setup-update-btn" class="btn-primary" style="background:#ffa726" hidden>Update (new cards only)</button>
+                        <button id="setup-cancel-btn" class="btn-primary" style="background:#e53935" hidden>Cancel</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price Refresh -->
+            <div class="settings-card">
+                <div class="settings-card-header">
+                    <h3>Prices</h3>
+                </div>
+                <div class="settings-card-body">
+                    <div class="form-group" style="margin-bottom:12px">
+                        <label>Price displayed in collection</label>
+                        <select id="setting-price-display">
+                            <option value="trend">Trend (Cardmarket)</option>
+                            <option value="cm_min">Lowest offer</option>
+                            <option value="cm_avg">Average of first 5 offers</option>
+                            <option value="cm_median">Median of first 5 offers</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cardmarket Bulk Sync -->
+            <div class="settings-card">
+                <div class="settings-card-header">
+                    <h3>Cardmarket Bulk Sync</h3>
+                </div>
+                <div class="settings-card-body">
+                    <p class="text-muted">Update prices for all cards from Cardmarket via Firefox extension. Requires the extension to be active and connected.</p>
+                    <div style="display:flex;gap:8px;margin-top:10px">
+                        <button id="cm-bulk-start" class="btn-primary">Start Sync</button>
+                        <button id="cm-bulk-stop" class="btn-primary" style="background:#e53935" hidden>Stop</button>
+                        <button id="cm-bulk-resume" class="btn-primary" style="background:#ffa726" hidden>Resume</button>
+                    </div>
+                    <div id="cm-bulk-progress" style="margin-top:12px" hidden>
+                        <div class="progress-bar-container">
+                            <div id="cm-bulk-bar" class="progress-bar-fill"></div>
+                        </div>
+                        <p id="cm-bulk-status" class="text-muted" style="margin-top:6px"></p>
+                    </div>
+                    <div id="cm-bulk-failed" style="margin-top:10px" hidden>
+                        <p class="text-muted"><strong>Cards not found:</strong></p>
+                        <ul id="cm-bulk-failed-list" class="text-muted" style="font-size:0.8rem;max-height:200px;overflow-y:auto"></ul>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Future: GPT Vision, API Keys, etc. -->
+            <div class="settings-card">
+                <div class="settings-card-header">
+                    <h3>Advanced Recognition</h3>
+                </div>
+                <div class="settings-card-body">
+                    <p class="text-muted">Coming soon: GPT Vision integration for set code and rarity reading.</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- ==================== CARD DETAIL MODAL ==================== -->
+        <div id="card-modal" class="modal" hidden>
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <div class="modal-body">
+                    <img id="modal-img" src="" alt="">
+                    <div id="modal-details"></div>
+                </div>
+
+                <div id="modal-collection-info"></div>
+
+                <div class="modal-actions">
+                    <div class="qty-control">
+                        <button id="modal-decrease" class="btn-qty">-</button>
+                        <span id="modal-quantity"></span>
+                        <button id="modal-increase" class="btn-qty">+</button>
+                    </div>
+                    <button id="modal-split" class="btn-secondary btn-sm">Split</button>
+                    <button id="modal-delete" class="btn-danger btn-sm">Remove</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== SPLIT MODAL ==================== -->
+        <div id="split-modal" class="modal" hidden>
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <h3>Split card</h3>
+                <p class="text-muted" id="split-info"></p>
+
+                <div class="form-group">
+                    <label for="split-qty">How many copies to split</label>
+                    <input type="number" id="split-qty" min="1" value="1" class="form-input">
+                </div>
+                <div class="form-group">
+                    <label for="split-rarity">New rarity</label>
+                    <select id="split-rarity"></select>
+                </div>
+                <div class="form-group">
+                    <label for="split-condition">New condition</label>
+                    <select id="split-condition">
+                        <option value="Near Mint">Near Mint</option>
+                        <option value="Lightly Played">Lightly Played</option>
+                        <option value="Moderately Played">Moderately Played</option>
+                        <option value="Heavily Played">Heavily Played</option>
+                        <option value="Damaged">Damaged</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="split-lang">New language</label>
+                    <select id="split-lang">
+                        <option value="IT">Italian</option>
+                        <option value="EN">English</option>
+                        <option value="FR">Fran&ccedil;ais</option>
+                        <option value="DE">Deutsch</option>
+                        <option value="ES">Espa&ntilde;ol</option>
+                        <option value="PT">Portugu&ecirc;s</option>
+                        <option value="JA">日本語</option>
+                        <option value="KO">한국어</option>
+                    </select>
+                </div>
+
+                <button id="split-confirm" class="btn-primary btn-full">Split</button>
+            </div>
+        </div>
+
+        <!-- ==================== ADD CARD MODAL ==================== -->
+        <div id="add-modal" class="modal" hidden>
+            <div class="modal-backdrop"></div>
+            <div class="modal-content">
+                <button class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <div class="add-modal-header">
+                    <img id="add-modal-img" src="" alt="">
+                    <div>
+                        <h3 id="add-modal-name"></h3>
+                        <p id="add-modal-type" class="text-muted"></p>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="add-set-select">Expansion</label>
+                    <select id="add-set-select"></select>
+                </div>
+
+                <div class="form-group">
+                    <label for="add-rarity">Rarity</label>
+                    <select id="add-rarity">
+                        <option value="Common">Common</option>
+                        <option value="Rare">Rare</option>
+                        <option value="Super Rare">Super Rare</option>
+                        <option value="Ultra Rare">Ultra Rare</option>
+                        <option value="Secret Rare">Secret Rare</option>
+                        <option value="Ultimate Rare">Ultimate Rare</option>
+                        <option value="Ghost Rare">Ghost Rare</option>
+                        <option value="Starlight Rare">Starlight Rare</option>
+                        <option value="Collector's Rare">Collector's Rare</option>
+                        <option value="Premium Gold Rare">Premium Gold Rare</option>
+                        <option value="Prismatic Secret Rare">Prismatic Secret Rare</option>
+                        <option value="Quarter Century Secret Rare">Quarter Century Secret Rare</option>
+                        <option value="Platinum Secret Rare">Platinum Secret Rare</option>
+                        <option value="Short Print">Short Print</option>
+                    </select>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="add-condition">Condition</label>
+                        <select id="add-condition">
+                            <option value="Mint">Mint</option>
+                            <option value="Near Mint" selected>Near Mint</option>
+                            <option value="Excellent">Excellent</option>
+                            <option value="Good">Good</option>
+                            <option value="Light Played">Light Played</option>
+                            <option value="Played">Played</option>
+                            <option value="Poor">Poor</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="add-lang">Language</label>
+                        <select id="add-lang">
+                            <option value="IT">Italian</option>
+                            <option value="EN">English</option>
+                            <option value="FR">Fran&ccedil;ais</option>
+                            <option value="DE">Deutsch</option>
+                            <option value="ES">Espa&ntilde;ol</option>
+                            <option value="PT">Portugu&ecirc;s</option>
+                            <option value="JA">日本語</option>
+                            <option value="KO">한국어</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="add-qty">Quantity</label>
+                        <input type="number" id="add-qty" value="1" min="1" step="1">
+                    </div>
+                    <div class="form-group" style="flex:2">
+                        <label for="add-location">Location <span class="text-muted">(optional)</span></label>
+                        <input type="text" id="add-location" placeholder="e.g. binder, deck blue-eyes...">
+                    </div>
+                </div>
+
+                <button id="add-modal-confirm" class="btn-primary btn-full">Add to collection</button>
+            </div>
+        </div>
+
+        <!-- ==================== SEARCH MODAL ==================== -->
+        <div id="search-modal" class="modal" hidden>
+            <div class="modal-backdrop"></div>
+            <div class="modal-content modal-large">
+                <button class="modal-close">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                </button>
+                <h2>Add card</h2>
+                <div class="search-bar" style="margin-bottom:16px">
+                    <svg class="search-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+                    <input type="text" id="ygopro-search-input" placeholder="Name or set code (e.g. Ash Blossom, BLMR-IT065, BLMR...)">
+                </div>
+                <div id="search-results-grid" class="card-grid"></div>
+            </div>
+        </div>
+    </main>
+
+    <script src="/js/app.js"></script>
+</body>
+</html>
