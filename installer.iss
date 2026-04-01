@@ -2,7 +2,7 @@
 ; Requires Inno Setup 6+ (https://jrsoftware.org/isinfo.php)
 
 #define MyAppName "YugiPy"
-#define MyAppVersion "1.0.0"
+#define MyAppVersion "1.0.1"
 #define MyAppPublisher "ArcademMan"
 #define MyAppExeName "YugiPy.exe"
 #define MyAppURL "https://github.com/riccardo/yugipy"
