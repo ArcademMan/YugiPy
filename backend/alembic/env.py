@@ -10,10 +10,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.database import Base
 from app.models import Card  # noqa: F401 — ensure model is registered
+from app.paths import COLLECTION_DB
 
 config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
+
+# Always use the same DB as the running application (in AppData)
+config.set_main_option("sqlalchemy.url", f"sqlite:///{COLLECTION_DB}")
 
 target_metadata = Base.metadata
 

@@ -314,7 +314,7 @@ def _parse_candidate(data: dict) -> ScanCandidate:
 
     return ScanCandidate(
         card_id=data["id"],
-        name=data["name"],
+        name=data.get("name_en") or data["name"],
         type=data["type"],
         frame_type=data.get("frameType", ""),
         description=data.get("desc", ""),
@@ -336,7 +336,7 @@ def _parse_card(data: dict) -> CardBase:
     images = data.get("card_images", [{}])[0]
     return CardBase(
         card_id=data["id"],
-        name=data["name"],
+        name=data.get("name_en") or data["name"],
         type=data["type"],
         frame_type=data.get("frameType", ""),
         description=data.get("desc", ""),

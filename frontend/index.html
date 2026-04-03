@@ -30,6 +30,10 @@
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/></svg>
                 <span>Book</span>
             </button>
+            <button class="nav-btn" data-view="stats">
+                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+                <span>Stats</span>
+            </button>
             <button class="nav-btn" data-view="settings">
                 <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
                 <span>Settings</span>
@@ -57,6 +61,7 @@
                     <option value="price-asc">Price ↑</option>
                     <option value="name-asc">Name A-Z</option>
                     <option value="name-desc">Name Z-A</option>
+                    <option value="type">Type</option>
                     <option value="qty-desc">Quantity ↓</option>
                     <option value="id-desc">Newest</option>
                     <option value="id-asc">Oldest</option>
@@ -83,6 +88,10 @@
                     <option value="JA">Japanese</option>
                     <option value="KO">Korean</option>
                 </select>
+                <select id="filter-archetype"><option value="">All archetypes</option></select>
+                <select id="filter-set"><option value="">All sets</option></select>
+                <select id="filter-type"><option value="">All types</option></select>
+                <select id="filter-level"><option value="">All levels</option></select>
             </div>
 
             <div id="card-grid" class="card-grid"></div>
@@ -195,6 +204,7 @@
                             <select id="book-sort-by">
                                 <option value="rarity" selected>Rarity</option>
                                 <option value="name">Name</option>
+                                <option value="type">Type</option>
                                 <option value="set_code">Set code</option>
                                 <option value="price">Price</option>
                             </select>
@@ -281,6 +291,123 @@
             </div>
         </section>
 
+        <!-- ==================== STATS ==================== -->
+        <section id="view-stats" class="view">
+            <div class="page-header">
+                <h1>Statistics</h1>
+            </div>
+
+            <div id="stats-loading" class="loading-state" hidden>
+                <div class="spinner"></div>
+                <p>Loading statistics...</p>
+            </div>
+
+            <div id="stats-empty" class="empty-state" hidden>
+                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.3"><path d="M18 20V10"/><path d="M12 20V4"/><path d="M6 20v-6"/></svg>
+                <h3>No data</h3>
+                <p>Add some cards to your collection to see statistics</p>
+            </div>
+
+            <div id="stats-content" hidden>
+                <!-- Overview KPIs -->
+                <div class="stats-overview-grid">
+                    <div class="stats-kpi-card">
+                        <div class="kpi-value" id="kpi-total-value">--</div>
+                        <div class="kpi-label">Total Value</div>
+                    </div>
+                    <div class="stats-kpi-card">
+                        <div class="kpi-value" id="kpi-unique">--</div>
+                        <div class="kpi-label">Unique Entries</div>
+                    </div>
+                    <div class="stats-kpi-card">
+                        <div class="kpi-value" id="kpi-copies">--</div>
+                        <div class="kpi-label">Total Copies</div>
+                    </div>
+                    <div class="stats-kpi-card">
+                        <div class="kpi-value" id="kpi-distinct">--</div>
+                        <div class="kpi-label">Distinct Cards</div>
+                    </div>
+                    <div class="stats-kpi-card">
+                        <div class="kpi-value" id="kpi-avg-value">--</div>
+                        <div class="kpi-label">Avg Card Value</div>
+                    </div>
+                    <div class="stats-kpi-card">
+                        <div class="kpi-value" id="kpi-priced">--</div>
+                        <div class="kpi-label">Priced / Unpriced</div>
+                    </div>
+                </div>
+
+                <!-- Top Valuable Cards -->
+                <div class="stats-section-card">
+                    <h3>Most Valuable Cards</h3>
+                    <div id="top-valuable-list" class="top-valuable-list"></div>
+                </div>
+
+                <!-- Charts Grid -->
+                <div class="stats-charts-grid">
+                    <div class="stats-section-card">
+                        <h3>By Rarity</h3>
+                        <div class="chart-container"><canvas id="chart-rarity"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>By Card Type</h3>
+                        <div class="chart-container"><canvas id="chart-type"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>By Condition</h3>
+                        <div class="chart-container"><canvas id="chart-condition"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>By Language</h3>
+                        <div class="chart-container"><canvas id="chart-lang"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>By Attribute</h3>
+                        <div class="chart-container"><canvas id="chart-attribute"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>By Monster Race</h3>
+                        <div class="chart-container"><canvas id="chart-race"></canvas></div>
+                    </div>
+                </div>
+
+                <div class="stats-charts-grid stats-charts-wide">
+                    <div class="stats-section-card">
+                        <h3>Value by Rarity</h3>
+                        <div class="chart-container chart-wide"><canvas id="chart-value-rarity"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>Value by Language</h3>
+                        <div class="chart-container chart-wide"><canvas id="chart-value-lang"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>Price Distribution</h3>
+                        <div class="chart-container chart-wide"><canvas id="chart-price-dist"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>Monster Level Distribution</h3>
+                        <div class="chart-container chart-wide"><canvas id="chart-level"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>Top Sets</h3>
+                        <div class="chart-container chart-wide"><canvas id="chart-sets"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>Top Archetypes</h3>
+                        <div class="chart-container chart-wide"><canvas id="chart-archetypes"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>ATK / DEF Distribution</h3>
+                        <div class="chart-container chart-wide"><canvas id="chart-atk-def"></canvas></div>
+                    </div>
+                    <div class="stats-section-card">
+                        <h3>Collection Growth</h3>
+                        <div class="chart-container chart-wide"><canvas id="chart-growth"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
         <!-- ==================== SETTINGS ==================== -->
         <section id="view-settings" class="view">
             <div class="page-header">
@@ -337,6 +464,25 @@
                 </div>
             </div>
 
+            <!-- Image Download -->
+            <div class="settings-card">
+                <div class="settings-card-header">
+                    <h3>Card Images</h3>
+                </div>
+                <div class="settings-card-body">
+                    <p class="text-muted">Download missing card images for offline use.</p>
+                    <div style="display:flex;gap:8px;margin-top:10px;align-items:center">
+                        <button id="img-download-btn" class="btn-primary">Download missing images</button>
+                    </div>
+                    <div id="img-download-progress" style="margin-top:12px" hidden>
+                        <div class="progress-bar-container">
+                            <div id="img-download-bar" class="progress-bar-fill"></div>
+                        </div>
+                        <p id="img-download-status" class="text-muted" style="margin-top:6px"></p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Cardmarket Bulk Sync -->
             <div class="settings-card">
                 <div class="settings-card-header">
@@ -362,15 +508,6 @@
                 </div>
             </div>
 
-            <!-- Future: GPT Vision, API Keys, etc. -->
-            <div class="settings-card">
-                <div class="settings-card-header">
-                    <h3>Advanced Recognition</h3>
-                </div>
-                <div class="settings-card-body">
-                    <p class="text-muted">Coming soon: GPT Vision integration for set code and rarity reading.</p>
-                </div>
-            </div>
         </section>
 
         <!-- ==================== CARD DETAIL MODAL ==================== -->
@@ -381,7 +518,12 @@
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
                 <div class="modal-body">
-                    <img id="modal-img" src="" alt="">
+                    <div class="modal-img-wrapper">
+                        <button id="modal-img-prev" class="modal-img-arrow modal-img-arrow-left" hidden>&lsaquo;</button>
+                        <img id="modal-img" src="" alt="">
+                        <button id="modal-img-next" class="modal-img-arrow modal-img-arrow-right" hidden>&rsaquo;</button>
+                        <span id="modal-img-counter" class="modal-img-counter" hidden></span>
+                    </div>
                     <div id="modal-details"></div>
                 </div>
 
@@ -467,22 +609,7 @@
 
                 <div class="form-group">
                     <label for="add-rarity">Rarity</label>
-                    <select id="add-rarity">
-                        <option value="Common">Common</option>
-                        <option value="Rare">Rare</option>
-                        <option value="Super Rare">Super Rare</option>
-                        <option value="Ultra Rare">Ultra Rare</option>
-                        <option value="Secret Rare">Secret Rare</option>
-                        <option value="Ultimate Rare">Ultimate Rare</option>
-                        <option value="Ghost Rare">Ghost Rare</option>
-                        <option value="Starlight Rare">Starlight Rare</option>
-                        <option value="Collector's Rare">Collector's Rare</option>
-                        <option value="Premium Gold Rare">Premium Gold Rare</option>
-                        <option value="Prismatic Secret Rare">Prismatic Secret Rare</option>
-                        <option value="Quarter Century Secret Rare">Quarter Century Secret Rare</option>
-                        <option value="Platinum Secret Rare">Platinum Secret Rare</option>
-                        <option value="Short Print">Short Print</option>
-                    </select>
+                    <select id="add-rarity"></select>
                 </div>
 
                 <div class="form-row">
@@ -545,6 +672,7 @@
         </div>
     </main>
 
-    <script src="/js/app.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+    <script type="module" src="/js/app.js"></script>
 </body>
 </html>

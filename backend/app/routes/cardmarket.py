@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 
 from fastapi import APIRouter, Depends, WebSocket, WebSocketDisconnect
 from sqlalchemy import select
@@ -10,10 +11,53 @@ from ..models import Card
 
 router = APIRouter(tags=["cardmarket"])
 
-# Holds the single extension WebSocket connection
-_ext_ws: WebSocket | None = None
+LOG = logging.getLogger("cardmarket")
+
+# Holds the single extension WebSocket connection.
+# Can be either a FastAPI WebSocket (WSS via main server)
+# or a plain websockets.WebSocketServerProtocol (WS via local relay).
+_ext_ws = None
 # Pending price requests: card_db_id -> Future
 _pending: dict[int, asyncio.Future] = {}
+
+# ── Plain WS relay on localhost (no SSL, for the browser extension) ────
+
+EXT_WS_PORT = 8001
+
+
+async def _plain_ws_handler(websocket):
+    """Handle extension connection on the plain WS relay (port 8001)."""
+    global _ext_ws
+    _ext_ws = websocket
+    LOG.info("Extension connected via plain WS relay (port %d)", EXT_WS_PORT)
+    try:
+        async for raw in websocket:
+            msg = json.loads(raw)
+            if msg.get("action") == "price_result":
+                card_id = msg.get("card_id")
+                fut = _pending.pop(card_id, None)
+                if fut and not fut.done():
+                    fut.set_result(msg)
+    except Exception:
+        pass
+    finally:
+        if _ext_ws is websocket:
+            _ext_ws = None
+        LOG.info("Extension disconnected from plain WS relay")
+
+
+async def start_ext_ws_relay():
+    """Start a plain (no-TLS) WebSocket server on localhost for the extension."""
+    try:
+        import websockets
+        server = await websockets.serve(
+            _plain_ws_handler, "127.0.0.1", EXT_WS_PORT,
+        )
+        LOG.info("Extension WS relay listening on ws://127.0.0.1:%d", EXT_WS_PORT)
+        return server
+    except OSError as e:
+        LOG.warning("Could not start extension WS relay on port %d: %s", EXT_WS_PORT, e)
+        return None
 
 # Bulk sync state
 _bulk_running = False
@@ -89,6 +133,8 @@ def _process_result(card: Card, result: dict, db: Session) -> dict:
         card.price_cm_avg = calc["avg"]
         card.price_cm_median = calc["median"]
     if trend is not None or calc["min"] is not None:
+        from datetime import datetime, timezone
+        card.price_updated_at = datetime.now(timezone.utc)
         db.commit()
         db.refresh(card)
 
@@ -100,28 +146,26 @@ def _process_result(card: Card, result: dict, db: Session) -> dict:
     }
 
 
-async def _scrape_one(card_db_id: int, card: Card, db: Session) -> dict:
+async def _send_scrape(card_db_id: int, url: str, card: Card) -> dict:
     """Send a scrape request to the extension and wait for result."""
-    from ..cardmarket_maps import get_cardmarket_url
-
     if _ext_ws is None:
         return {"error": "extension_not_connected"}
-
-    url = get_cardmarket_url(card, db)
-    if not url:
-        return {"error": "cannot_build_url"}
 
     loop = asyncio.get_event_loop()
     fut = loop.create_future()
     _pending[card_db_id] = fut
 
-    await _ext_ws.send_text(json.dumps({
+    payload = json.dumps({
         "action": "scrape_price",
         "card_id": card_db_id,
         "url": url,
         "condition": card.condition,
         "lang": card.lang,
-    }))
+    })
+    if hasattr(_ext_ws, "send_text"):
+        await _ext_ws.send_text(payload)
+    else:
+        await _ext_ws.send(payload)
 
     try:
         result = await asyncio.wait_for(fut, timeout=20)
@@ -129,12 +173,43 @@ async def _scrape_one(card_db_id: int, card: Card, db: Session) -> dict:
         _pending.pop(card_db_id, None)
         return {"error": "timeout"}
 
-    if "error" in result:
+    return result
+
+
+async def _scrape_one(card_db_id: int, card: Card, db: Session) -> dict:
+    """Scrape card price. If no offers found for the desired language, retry with language filter."""
+    from ..cardmarket_maps import get_cardmarket_url, _LANG_MAP
+
+    url = get_cardmarket_url(card, db)
+    if not url:
+        return {"error": "cannot_build_url"}
+
+    result = await _send_scrape(card_db_id, url, card)
+
+    if result.get("error"):
         return {"error": result["error"]}
     if result.get("cloudflare"):
         return {"error": "cloudflare"}
     if result.get("not_found"):
         return {"error": "not_found"}
+
+    # Check if we got offers matching the card's language
+    offers = result.get("offers", [])
+    has_lang_offers = any(o.get("lang") == card.lang for o in offers)
+
+    if not has_lang_offers and card.lang and result.get("pageUrl"):
+        # Retry with language filter on the actual card page URL
+        lang_id = _LANG_MAP.get(card.lang)
+        if lang_id:
+            page_url = result["pageUrl"].split("?")[0]
+            retry_url = f"{page_url}?language={lang_id}"
+            LOG.info("No %s offers found, retrying with language filter: %s", card.lang, retry_url)
+            retry_result = await _send_scrape(card_db_id, retry_url, card)
+
+            if not retry_result.get("error") and not retry_result.get("cloudflare") and not retry_result.get("not_found"):
+                # Merge: keep trend from first result, offers from retry
+                retry_result["trend"] = retry_result.get("trend") or result.get("trend")
+                result = retry_result
 
     return _process_result(card, result, db)
 

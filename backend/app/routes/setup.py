@@ -86,6 +86,88 @@ async def run_setup():
     return StreamingResponse(_setup_stream(), media_type="text/event-stream")
 
 
+@router.get("/download-images")
+async def download_images():
+    """Download missing full card images (all cards in YGOProDeck DB). SSE progress."""
+    if _state["running"]:
+        async def already():
+            yield f"data: {json.dumps({'error': 'already_running'})}\n\n"
+        return StreamingResponse(already(), media_type="text/event-stream")
+
+    return StreamingResponse(_download_images_stream(), media_type="text/event-stream")
+
+
+async def _download_images_stream():
+    import httpx
+
+    _state["running"] = True
+    _state["cancel"] = False
+
+    try:
+        yield _sse("info", message="Fetching card database...")
+
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                resp = await client.get(YGOPRODECK_API)
+                resp.raise_for_status()
+                cards = resp.json()["data"]
+        except Exception as e:
+            yield _sse("error", message=f"Failed to fetch card database: {e}")
+            return
+
+        # Collect all image IDs (including alternate arts)
+        FULL_IMAGES_DIR.mkdir(exist_ok=True)
+        existing = {p.stem for p in FULL_IMAGES_DIR.glob("*.jpg")}
+
+        to_download = []
+        for card in cards:
+            for img in card.get("card_images", []):
+                img_id = str(img["id"])
+                url = img.get("image_url")
+                if img_id not in existing and url:
+                    to_download.append((img_id, url))
+
+        total = len(to_download)
+        if total == 0:
+            yield _sse("done", message="All images already downloaded")
+            return
+
+        yield _sse("info", message=f"{total} images to download")
+
+        done = 0
+        failed = 0
+        interval = 1.0 / REQUESTS_PER_SECOND
+
+        async with httpx.AsyncClient(timeout=15) as client:
+            for img_id, url in to_download:
+                if _state["cancel"]:
+                    yield _sse("cancelled")
+                    return
+
+                t0 = time.monotonic()
+                try:
+                    resp = await client.get(url, timeout=15)
+                    resp.raise_for_status()
+                    (FULL_IMAGES_DIR / f"{img_id}.jpg").write_bytes(resp.content)
+                    done += 1
+                except Exception:
+                    failed += 1
+
+                if (done + failed) % 50 == 0 or (done + failed) == total:
+                    yield _sse("progress", done=done + failed, total=total, ok=done, failed=failed)
+
+                elapsed = time.monotonic() - t0
+                if elapsed < interval:
+                    await asyncio.sleep(interval - elapsed)
+
+        yield _sse("done", message=f"Downloaded {done} images, {failed} failed")
+
+    except Exception as e:
+        yield _sse("error", message=str(e))
+    finally:
+        _state["running"] = False
+
+
 def _sse(event_type: str, **data):
     """Format an SSE message."""
     payload = {"type": event_type, **data}

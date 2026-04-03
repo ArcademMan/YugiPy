@@ -1,16 +1,36 @@
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Card
+from ..paths import FULL_IMAGES_DIR
 from ..schemas import CardCreate, CardResponse, CardSplit, CardUpdate
 
 router = APIRouter(prefix="/api/cards", tags=["cards"])
 
 YGOPRODECK_API = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
+
+
+@router.get("/img/{card_image_id}")
+async def get_card_image(card_image_id: int):
+    """Serve a card image from local cache, or download from YGOProDeck and cache it."""
+    FULL_IMAGES_DIR.mkdir(exist_ok=True)
+    local = FULL_IMAGES_DIR / f"{card_image_id}.jpg"
+    if local.exists():
+        return FileResponse(local, media_type="image/jpeg")
+    # Download, cache locally, and serve
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            resp = await client.get(f"https://images.ygoprodeck.com/images/cards/{card_image_id}.jpg")
+            resp.raise_for_status()
+            local.write_bytes(resp.content)
+            return FileResponse(local, media_type="image/jpeg")
+    except Exception:
+        return RedirectResponse(f"https://images.ygoprodeck.com/images/cards/{card_image_id}.jpg")
 
 
 @router.get("", response_model=list[CardResponse])

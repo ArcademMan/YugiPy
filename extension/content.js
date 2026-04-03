@@ -99,5 +99,6 @@
   }
 
   const data = scrape();
+  data.pageUrl = window.location.href;
   browser.runtime.sendMessage({ type: "price_data", data });
 })();

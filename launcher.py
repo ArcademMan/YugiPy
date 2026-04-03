@@ -76,21 +76,68 @@ def _get_local_ip() -> str:
         return "127.0.0.1"
 
 
+def _get_all_local_ips() -> list[str]:
+    """Return all local IPv4 addresses (excluding loopback)."""
+    ips = []
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))
+        ips.append(s.getsockname()[0])
+        s.close()
+    except Exception:
+        pass
+    try:
+        for info in socket.getaddrinfo(socket.gethostname(), None, socket.AF_INET):
+            ip = info[4][0]
+            if ip not in ips and ip != "127.0.0.1":
+                ips.append(ip)
+    except Exception:
+        pass
+    return ips
+
+
+def _cert_needs_regen() -> bool:
+    """Check if the existing cert's SANs cover localhost + current local IPs."""
+    if not CERT_FILE.exists() or not KEY_FILE.exists():
+        return True
+    try:
+        from cryptography import x509 as x509mod
+        cert = x509mod.load_pem_x509_certificate(CERT_FILE.read_bytes())
+        ext = cert.extensions.get_extension_for_class(x509mod.SubjectAlternativeName)
+        san_dns = set(ext.value.get_values_for_type(x509mod.DNSName))
+        san_ips = {str(ip) for ip in ext.value.get_values_for_type(x509mod.IPAddress)}
+        needed_ips = {"127.0.0.1"} | set(_get_all_local_ips())
+        return not ({"localhost"} <= san_dns and needed_ips <= san_ips)
+    except Exception:
+        return True
+
+
 def _ensure_certs():
-    """Generate self-signed SSL cert if missing (same logic as run.py)."""
+    """Generate self-signed SSL cert with SANs for localhost + all local IPs."""
     CERT_DIR.mkdir(exist_ok=True)
-    if CERT_FILE.exists() and KEY_FILE.exists():
+    if not _cert_needs_regen():
         return
     from cryptography import x509
     from cryptography.hazmat.primitives import hashes, serialization
     from cryptography.hazmat.primitives.asymmetric import rsa
     from cryptography.x509.oid import NameOID
     import datetime
+    import ipaddress
+
+    local_ips = _get_all_local_ips()
 
     key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
     subject = issuer = x509.Name([
         x509.NameAttribute(NameOID.COMMON_NAME, "yugipy-local"),
     ])
+
+    san_names = [
+        x509.DNSName("localhost"),
+        x509.IPAddress(ipaddress.ip_address("127.0.0.1")),
+    ]
+    for ip in local_ips:
+        san_names.append(x509.IPAddress(ipaddress.ip_address(ip)))
+
     cert = (
         x509.CertificateBuilder()
         .subject_name(subject)
@@ -99,6 +146,7 @@ def _ensure_certs():
         .serial_number(x509.random_serial_number())
         .not_valid_before(datetime.datetime.now(datetime.timezone.utc))
         .not_valid_after(datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(days=365))
+        .add_extension(x509.SubjectAlternativeName(san_names), critical=False)
         .sign(key, hashes.SHA256())
     )
     KEY_FILE.write_bytes(

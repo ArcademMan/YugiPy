@@ -44,6 +44,7 @@ class Card(Base):
     price_cm_min: Mapped[float | None] = mapped_column(Float, nullable=True)  # Lowest offer price
     price_cm_avg: Mapped[float | None] = mapped_column(Float, nullable=True)  # Average of first 5 offers
     price_cm_median: Mapped[float | None] = mapped_column(Float, nullable=True)  # Median of first 5 offers
+    price_updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime, default=lambda: datetime.now(timezone.utc)

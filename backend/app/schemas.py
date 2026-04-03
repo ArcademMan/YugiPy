@@ -40,6 +40,7 @@ class CardUpdate(BaseModel):
     price_cardmarket: float | None = None
     price_manual: bool | None = None
     set_code: str | None = None
+    image_url: str | None = None
 
 
 class CardSplit(BaseModel):
@@ -63,6 +64,7 @@ class CardResponse(CardBase):
     price_cm_min: float | None = None
     price_cm_avg: float | None = None
     price_cm_median: float | None = None
+    price_updated_at: datetime | None = None
     created_at: datetime
     updated_at: datetime
 
