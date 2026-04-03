@@ -2,7 +2,7 @@
 ; Requires Inno Setup 6+ (https://jrsoftware.org/isinfo.php)
 
 #define MyAppName "YugiPy"
-#define MyAppVersion "1.0.1"
+#define MyAppVersion "1.0.3"
 #define MyAppPublisher "ArcademMan"
 #define MyAppExeName "YugiPy.exe"
 #define MyAppURL "https://github.com/riccardo/yugipy"
@@ -40,6 +40,8 @@ Name: "startmenu"; Description: "Create a Start Menu shortcut"; GroupDescription
 [Files]
 ; PyInstaller output directory
 Source: "dist\YugiPy\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; Pre-built card hash index — placed in APPDATA so the setup wizard can be skipped
+Source: "data\card_hashes.db"; DestDir: "{userappdata}\AmMstools\YugiPy\data"; Flags: onlyifdoesntexist
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startmenu
