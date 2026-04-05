@@ -123,13 +123,31 @@ document.querySelectorAll(".rot-btn").forEach((btn) => {
     });
 });
 
+const CARD_RATIO = 59 / 86; // width / height
+const GUIDE_WIDTH_FRAC = 0.55; // fraction of container width
+
+function _cropGuideRegion(video) {
+    // Calculate the guide rectangle in video pixel coordinates.
+    // The guide is centered, 55% of the displayed width, aspect ratio 59:86.
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    const cropW = Math.round(vw * GUIDE_WIDTH_FRAC);
+    const cropH = Math.round(cropW / CARD_RATIO);
+    const cropX = Math.round((vw - cropW) / 2);
+    const cropY = Math.round((vh - cropH) / 2);
+
+    const c = document.createElement("canvas");
+    c.width = cropW;
+    c.height = cropH;
+    c.getContext("2d").drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+    return c;
+}
+
 async function sendPreviewFrame() {
     const video = document.getElementById("camera-feed");
     if (!video || video.videoWidth === 0) return;
-    const c = document.createElement("canvas");
-    c.width = video.videoWidth;
-    c.height = video.videoHeight;
-    c.getContext("2d").drawImage(video, 0, 0);
+    const c = _cropGuideRegion(video);
     const blob = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.85));
     if (!blob) return;
     const form = new FormData();
@@ -243,16 +261,13 @@ function _updatePreviewDebug(container, data) {
 document.getElementById("capture-btn").addEventListener("click", async () => {
     stopPreviewLoop();
     const video = document.getElementById("camera-feed");
-    const canvas = document.getElementById("capture-canvas");
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    canvas.getContext("2d").drawImage(video, 0, 0);
+    const cropped = _cropGuideRegion(video);
     document.getElementById("camera-container").style.display = "none";
     document.getElementById("capture-btn").hidden = true;
     document.getElementById("ocr-live-preview").hidden = true;
     document.getElementById("scan-loading").hidden = false;
 
-    canvas.toBlob(async (blob) => {
+    cropped.toBlob(async (blob) => {
         const form = new FormData();
         form.append("file", blob, "scan.jpg");
         form.append("rotation", getRotation());

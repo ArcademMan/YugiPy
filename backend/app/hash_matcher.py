@@ -1,9 +1,10 @@
 """
-Artwork-based card matching using multi-algorithm perceptual hashing,
-BK-Tree for fast lookup, and ORB feature matching as fallback.
+Artwork-based card matching using neural embeddings (primary),
+multi-algorithm perceptual hashing (fallback), BK-Tree for fast lookup,
+and ORB feature matching as secondary fallback.
 
-Loads the precomputed hash index (from build_index.py) and provides
-fast card lookup by comparing artwork hash values.
+Loads the precomputed hash index and embedding index (from build_index.py)
+and provides fast card lookup.
 """
 
 import sqlite3
@@ -15,7 +16,7 @@ import numpy as np
 from PIL import Image
 from pybktree import BKTree
 
-from .paths import HASH_DB as DB_PATH
+from .paths import HASH_DB as DB_PATH, DATA_DIR
 from .paths import IMAGES_DIR
 
 # Artwork region on a standard warped Yu-Gi-Oh card (portrait, 590x860)
@@ -168,10 +169,160 @@ def _get_index():
 
 
 def reload_index():
-    global _INDEX, _BKTREE, _PHASH_TO_ENTRIES
+    global _INDEX, _BKTREE, _PHASH_TO_ENTRIES, _EMB_INDEX, _CLIP_MODEL, _CLIP_PREPROCESS
     _INDEX = None
     _BKTREE = None
     _PHASH_TO_ENTRIES = None
+    _EMB_INDEX = None
+    _CLIP_MODEL = None
+    _CLIP_PREPROCESS = None
+
+
+# =============================================================
+# CLIP embedding matching
+# =============================================================
+
+_CLIP_MODEL = None
+_CLIP_PREPROCESS = None
+_EMB_INDEX: dict | None = None
+
+
+def _get_clip_model():
+    """Lazy-load CLIP model."""
+    global _CLIP_MODEL, _CLIP_PREPROCESS
+    if _CLIP_MODEL is None:
+        try:
+            import open_clip
+            import torch
+            device = "cuda" if torch.cuda.is_available() else "cpu"
+            model, _, preprocess = open_clip.create_model_and_transforms(
+                "ViT-B-32", pretrained="laion2b_s34b_b79k", device=device
+            )
+            model.eval()
+            _CLIP_MODEL = (model, device)
+            _CLIP_PREPROCESS = preprocess
+            print(f"[hash_matcher] CLIP model loaded on {device}")
+        except Exception as e:
+            print(f"[hash_matcher] Failed to load CLIP: {e}")
+            return None, None
+    return _CLIP_MODEL, _CLIP_PREPROCESS
+
+
+def _load_embedding_index() -> dict:
+    """Load embedding vectors from the DB. Returns {card_id: embedding_vector}."""
+    if not DB_PATH.exists():
+        return {}
+
+    conn = sqlite3.connect(str(DB_PATH))
+    try:
+        cursor = conn.execute("SELECT card_id, embedding FROM card_embeddings")
+    except sqlite3.OperationalError:
+        conn.close()
+        return {}
+
+    embeddings = {}
+    for card_id, blob in cursor.fetchall():
+        vec = np.frombuffer(blob, dtype=np.float32)
+        embeddings[card_id] = vec
+    conn.close()
+    return embeddings
+
+
+def _get_embedding_index():
+    global _EMB_INDEX
+    if _EMB_INDEX is None:
+        _EMB_INDEX = _load_embedding_index()
+        print(f"[hash_matcher] Embedding index loaded: {len(_EMB_INDEX)} cards")
+    return _EMB_INDEX
+
+
+def _compute_query_embedding(artwork_cv: np.ndarray) -> np.ndarray | None:
+    """Compute L2-normalized CLIP embedding for a query artwork."""
+    clip_info, preprocess = _get_clip_model()
+    if clip_info is None:
+        return None
+
+    model, device = clip_info
+    import torch
+
+    # Convert BGR OpenCV to PIL RGB
+    artwork_pil = Image.fromarray(cv2.cvtColor(artwork_cv, cv2.COLOR_BGR2RGB))
+    inp = preprocess(artwork_pil).unsqueeze(0).to(device)
+
+    with torch.no_grad():
+        emb = model.encode_image(inp)
+        emb = emb / emb.norm(dim=-1, keepdim=True)
+
+    vec = emb.cpu().numpy().flatten().astype(np.float32)
+    return vec
+
+
+def _embedding_rerank(artwork_cv: np.ndarray, candidates: list[dict]) -> list[dict]:
+    """Rerank hash-match candidates using neural embedding similarity."""
+    session = _get_embedding_session()
+    if session is None:
+        return candidates
+
+    emb_index = _get_embedding_index()
+    if not emb_index:
+        return candidates
+
+    query_vec = _compute_query_embedding(session, artwork_cv)
+
+    for r in candidates:
+        cid = r["card_id"]
+        if cid in emb_index:
+            sim = float(np.dot(emb_index[cid], query_vec))
+            r["emb_similarity"] = sim
+            # Boost distance: high embedding similarity reduces distance
+            r["distance"] *= (1.0 - 0.5 * max(0, sim))
+            r["confidence"] = max(r.get("confidence", 0), sim)
+        else:
+            r["emb_similarity"] = 0.0
+
+    candidates.sort(key=lambda x: x["distance"])
+    return candidates
+
+
+def _embedding_search(artwork_cv: np.ndarray, top_n: int = 10) -> list[dict]:
+    """Brute-force CLIP embedding search across all cards."""
+    emb_index = _get_embedding_index()
+    if not emb_index:
+        return []
+
+    query_vec = _compute_query_embedding(artwork_cv)
+    if query_vec is None:
+        return []
+
+    card_ids = list(emb_index.keys())
+    matrix = np.stack([emb_index[cid] for cid in card_ids])
+    similarities = matrix @ query_vec
+
+    top_indices = np.argsort(similarities)[::-1][:top_n]
+
+    index, _, _ = _get_index()
+    id_to_entry = {e.card_id: e for e in index}
+
+    results = []
+    for idx in top_indices:
+        card_id = card_ids[idx]
+        sim = float(similarities[idx])
+        entry = id_to_entry.get(card_id)
+        if entry is None:
+            continue
+        results.append({
+            "card_id": card_id,
+            "name": entry.name,
+            "type": entry.card_type,
+            "frame_type": entry.frame_type,
+            "image_url": entry.image_url,
+            "distance": 1.0 - sim,
+            "votes": 0,
+            "confidence": sim,
+            "match_method": "embedding",
+        })
+
+    return results
 
 
 # =============================================================
@@ -298,42 +449,22 @@ def _orb_match(artwork: Image.Image, candidate_ids: list[int]) -> list[tuple[int
 
 def match_artwork(card_img: np.ndarray, top_n: int = 5) -> list[dict]:
     """
-    Match a warped card image against the hash index.
-
-    Pipeline:
-    1. Extract artwork (hardcoded crop)
-    2. Normalize (grayscale + CLAHE + blur + resize to 256x256)
-    3. Multi-hash lookup via BK-Tree (pHash + dHash + aHash)
-    4. If top match is ambiguous, run ORB on top candidates
-    5. Try 180° rotation if no strong match found
+    Match a warped card image against the index.
+    Uses only neural embedding — confidence = raw cosine similarity.
     """
-    index, bktree, phash_to_entries = _get_index()
+    index, _, _ = _get_index()
     if not index:
         return []
 
     artwork = extract_artwork(card_img)
-    results = _match_single(artwork, index, bktree, phash_to_entries)
+    artwork_cv = cv2.cvtColor(np.array(artwork), cv2.COLOR_RGB2BGR)
 
-    # ORB refinement for ambiguous matches
-    if results and MAX_DISTANCE < results[0]["distance"] <= MAX_DISTANCE_WEAK:
-        orb_candidates = [r["card_id"] for r in results[:10]]
-        orb_results = _orb_match(artwork, orb_candidates)
+    results = _embedding_search(artwork_cv, top_n=top_n)
 
-        if orb_results and orb_results[0][1] >= ORB_MIN_GOOD_MATCHES:
-            orb_score = {cid: count for cid, count in orb_results}
-            max_orb = max(orb_score.values()) if orb_score else 1
+    if results:
+        print(f"[match] -> {results[0]['name']}: {results[0]['confidence']:.3f}")
 
-            for r in results:
-                cid = r["card_id"]
-                if cid in orb_score:
-                    orb_boost = orb_score[cid] / max_orb
-                    r["distance"] *= (1.0 - 0.4 * orb_boost)
-                    r["confidence"] = max(0.0, 1.0 - r["distance"] / MAX_DISTANCE_WEAK)
-                    r["orb_matches"] = orb_score[cid]
-
-            results.sort(key=lambda x: (-x.get("votes", 0), x["distance"]))
-
-    return results[:top_n]
+    return results
 
 
 def is_index_available() -> bool:

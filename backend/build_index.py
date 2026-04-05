@@ -6,6 +6,7 @@ Usage:
     python -m backend.build_index --rehash     # rebuild hashes from local full images (no download)
     python -m backend.build_index --update     # only download new cards
     python -m backend.build_index --full-only  # only download full card images (skip cropped)
+    python -m backend.build_index --embeddings # rebuild only neural embeddings (no hash rebuild)
 
 Images are saved locally so hash parameters can be changed without re-downloading.
   - card_images/       → cropped artwork (624x624) for ORB matching
@@ -45,6 +46,11 @@ ARTWORK_REGION = {"x": 0.13, "y": 0.18, "w": 0.74, "h": 0.47}
 NORMALIZE_SIZE = 256
 
 
+ONNX_MODEL_URL = "https://github.com/onnx/models/raw/main/validated/vision/classification/mobilenet/model/mobilenetv2-12.onnx"
+ONNX_MODEL_PATH = None       # set after paths import
+ONNX_FEATURES_PATH = None    # truncated model for feature extraction
+
+
 def _init_db(conn: sqlite3.Connection):
     conn.execute("DROP TABLE IF EXISTS card_hashes")
     conn.execute("""
@@ -63,6 +69,16 @@ def _init_db(conn: sqlite3.Connection):
         )
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_phash ON card_hashes(phash)")
+    conn.commit()
+
+
+def _init_embeddings_table(conn: sqlite3.Connection):
+    conn.execute("""
+        CREATE TABLE IF NOT EXISTS card_embeddings (
+            card_id     INTEGER PRIMARY KEY,
+            embedding   BLOB NOT NULL
+        )
+    """)
     conn.commit()
 
 
@@ -278,6 +294,191 @@ def build_hashes():
     print(f"Hash database: {DB_PATH} ({DB_PATH.stat().st_size / 1024 / 1024:.1f} MB)")
 
 
+def _ensure_onnx_model() -> Path:
+    """Download MobileNetV2 ONNX model and create truncated feature model if not present."""
+    global ONNX_MODEL_PATH, ONNX_FEATURES_PATH
+    if ONNX_MODEL_PATH is None:
+        ONNX_MODEL_PATH = DATA_DIR / "mobilenetv2.onnx"
+        ONNX_FEATURES_PATH = DATA_DIR / "mobilenetv2_features.onnx"
+
+    if not ONNX_MODEL_PATH.exists():
+        import httpx
+        print(f"Downloading MobileNetV2 ONNX model...")
+        with httpx.Client(timeout=120, follow_redirects=True) as client:
+            resp = client.get(ONNX_MODEL_URL)
+            resp.raise_for_status()
+            ONNX_MODEL_PATH.write_bytes(resp.content)
+        print(f"  -> Saved to {ONNX_MODEL_PATH} ({ONNX_MODEL_PATH.stat().st_size / 1024 / 1024:.1f} MB)")
+
+    if not ONNX_FEATURES_PATH.exists():
+        print("Creating truncated feature extraction model...")
+        _create_feature_model(ONNX_MODEL_PATH, ONNX_FEATURES_PATH)
+        print(f"  -> Saved to {ONNX_FEATURES_PATH}")
+
+    return ONNX_FEATURES_PATH
+
+
+def _create_feature_model(src: Path, dst: Path):
+    """Truncate MobileNetV2 to output 1280-dim features from GlobalAveragePool."""
+    import onnx
+    from onnx import helper, TensorProto
+
+    model = onnx.load(str(src))
+
+    # Find the GlobalAveragePool output node name
+    gap_output = None
+    for node in model.graph.node:
+        if node.op_type == "GlobalAveragePool":
+            gap_output = node.output[0]
+            break
+
+    if gap_output is None:
+        raise RuntimeError("Could not find GlobalAveragePool in model")
+
+    # Keep only nodes up to and including GlobalAveragePool
+    nodes_to_keep = []
+    for node in model.graph.node:
+        nodes_to_keep.append(node)
+        if gap_output in node.output:
+            break
+
+    while len(model.graph.node) > 0:
+        model.graph.node.pop()
+    for n in nodes_to_keep:
+        model.graph.node.append(n)
+
+    # Replace output with feature layer
+    while len(model.graph.output) > 0:
+        model.graph.output.pop()
+    model.graph.output.append(
+        helper.make_tensor_value_info(gap_output, TensorProto.FLOAT, None)
+    )
+
+    onnx.save(model, str(dst))
+
+
+def _create_embedding_session():
+    """Create ONNX inference session for MobileNetV2 feature extraction."""
+    import onnxruntime as ort
+    model_path = _ensure_onnx_model()
+    session = ort.InferenceSession(str(model_path), providers=["CPUExecutionProvider"])
+    return session
+
+
+def _preprocess_for_embedding(artwork_cv: np.ndarray) -> np.ndarray:
+    """Preprocess artwork image for MobileNetV2 input.
+
+    MobileNetV2 expects: [1, 3, 224, 224] float32, normalized with ImageNet stats.
+    """
+    img = cv2.resize(artwork_cv, (224, 224))
+    img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+    img = img.astype(np.float32) / 255.0
+
+    # ImageNet normalization
+    mean = np.array([0.485, 0.456, 0.406], dtype=np.float32)
+    std = np.array([0.229, 0.224, 0.225], dtype=np.float32)
+    img = (img - mean) / std
+
+    # HWC -> NCHW
+    img = np.transpose(img, (2, 0, 1))
+    return np.expand_dims(img, axis=0)
+
+
+def _compute_embedding(session, artwork_cv: np.ndarray) -> np.ndarray:
+    """Compute embedding vector from artwork image using MobileNetV2.
+
+    Uses the 1280-dim feature vector from GlobalAveragePool (before classification).
+    Returns L2-normalized vector.
+    """
+    input_tensor = _preprocess_for_embedding(artwork_cv)
+    input_name = session.get_inputs()[0].name
+    output = session.run(None, {input_name: input_tensor})[0]
+
+    # Output shape is (1, 1280, 1, 1) — flatten to 1280-dim
+    vec = output.flatten().astype(np.float32)
+    norm = np.linalg.norm(vec)
+    if norm > 0:
+        vec = vec / norm
+    return vec
+
+
+def build_embeddings(force: bool = False):
+    """Build neural embedding index from local full card images."""
+    if not CARDS_JSON.exists():
+        print("No card data found. Run without --embeddings first to download images.")
+        return
+
+    cards = json.loads(CARDS_JSON.read_text(encoding="utf-8"))
+    print(f"Building embedding index from full card images...")
+
+    session = _create_embedding_session()
+
+    conn = sqlite3.connect(str(DB_PATH))
+
+    if force:
+        conn.execute("DROP TABLE IF EXISTS card_embeddings")
+        conn.commit()
+
+    _init_embeddings_table(conn)
+
+    # Check which cards already have embeddings
+    existing = set()
+    try:
+        cursor = conn.execute("SELECT card_id FROM card_embeddings")
+        existing = {row[0] for row in cursor.fetchall()}
+    except sqlite3.OperationalError:
+        pass
+
+    done = 0
+    skipped = 0
+
+    for card in cards:
+        card_id = card["id"]
+
+        if card_id in existing:
+            done += 1
+            continue
+
+        img_path = FULL_IMAGES_DIR / f"{card_id}.jpg"
+        if not img_path.exists():
+            skipped += 1
+            continue
+
+        try:
+            img_cv = cv2.imread(str(img_path), cv2.IMREAD_COLOR)
+            if img_cv is None:
+                raise ValueError("Failed to decode image")
+
+            artwork_cv = _extract_artwork_from_full(img_cv)
+            embedding = _compute_embedding(session, artwork_cv)
+
+            conn.execute(
+                "INSERT OR REPLACE INTO card_embeddings (card_id, embedding) VALUES (?, ?)",
+                (card_id, embedding.tobytes()),
+            )
+
+            done += 1
+            if done % 1000 == 0:
+                conn.commit()
+                print(f"  [{done}/{len(cards)}] embedded...")
+        except Exception as e:
+            print(f"  [WARN] Failed to embed {img_path.name}: {e}")
+            skipped += 1
+            continue
+
+    conn.commit()
+    conn.close()
+
+    print(f"\nDone! {done} cards embedded, {skipped} skipped")
+
+
+# Import DATA_DIR after paths are loaded
+try:
+    from backend.app.paths import DATA_DIR
+except ImportError:
+    from app.paths import DATA_DIR
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Build YugiPy card hash index")
     parser.add_argument("--update", action="store_true",
@@ -286,14 +487,20 @@ if __name__ == "__main__":
                         help="Rebuild hashes from local full images (no download)")
     parser.add_argument("--full-only", action="store_true",
                         help="Only download full card images (skip cropped)")
+    parser.add_argument("--embeddings", action="store_true",
+                        help="Rebuild only neural embeddings (no hash rebuild)")
     args = parser.parse_args()
 
     try:
-        if args.rehash:
+        if args.embeddings:
+            build_embeddings(force=True)
+        elif args.rehash:
             build_hashes()
+            build_embeddings(force=True)
         else:
             download_images(update_only=args.update, full_only=args.full_only)
             build_hashes()
+            build_embeddings(force=True)
     except KeyboardInterrupt:
         print("\nInterrupted.")
         sys.exit(1)

@@ -395,12 +395,26 @@ def _draw_detection_debug(img_cv: np.ndarray, pts: np.ndarray | None) -> np.ndar
 # Endpoints
 # =============================================================
 
+def _extract_artwork_direct(warped_cv: np.ndarray) -> np.ndarray:
+    """Extract artwork from a warped card image (590x860) using fixed proportions."""
+    h, w = warped_cv.shape[:2]
+    x1 = int(w * ARTWORK_REGION["x"])
+    y1 = int(h * ARTWORK_REGION["y"])
+    x2 = int(w * (ARTWORK_REGION["x"] + ARTWORK_REGION["w"]))
+    y2 = int(h * (ARTWORK_REGION["y"] + ARTWORK_REGION["h"]))
+    return warped_cv[y1:y2, x1:x2]
+
+
+# Fixed artwork region (same as hash_matcher / build_index)
+ARTWORK_REGION = {"x": 0.13, "y": 0.18, "w": 0.74, "h": 0.47}
+
+
 @router.post("/ocr-preview")
 async def ocr_preview(
     file: UploadFile = File(...),
     rotation: int = Form(default=0),
 ):
-    """Live preview: detect card + image hash match. No OCR in preview."""
+    """Live preview: extract artwork directly from card-shaped crop and match."""
     contents = await file.read()
     if not contents:
         return {"mode": "no_image"}
@@ -412,43 +426,28 @@ async def ocr_preview(
     if rotation:
         img_cv = _apply_rotation(img_cv, rotation)
 
-    pts = _detect_card(img_cv)
-    debug_img = _draw_detection_debug(img_cv, pts)
-    debug_b64 = _img_to_b64(debug_img, quality=60)
+    # Frontend sends a card-shaped crop from the overlay guide.
+    # Just resize to standard card dimensions — no card detection.
+    warped = cv2.resize(img_cv, (WARP_W, WARP_H))
+    warped_b64 = _img_to_b64(warped, quality=70)
 
-    if pts is None:
-        return {
-            "mode": "no_card",
-            "debug_image": debug_b64,
-        }
+    artwork_cv = _extract_artwork_direct(warped)
+    artwork_b64 = _img_to_b64(artwork_cv, quality=80)
 
-    warped = _warp_card(img_cv, pts)
-
-    # Image hash matching
+    # Match
     hash_match_name = ""
     hash_match_confidence = 0.0
     hash_match_image = ""
-    artwork_b64 = ""
     if is_index_available():
-        from ..hash_matcher import extract_artwork
-        artwork_pil = extract_artwork(warped)
-        import io as _io
-        buf = _io.BytesIO()
-        artwork_pil.save(buf, format="JPEG", quality=80)
-        artwork_b64 = base64.b64encode(buf.getvalue()).decode()
-
         matches = match_artwork(warped, top_n=3)
         if matches:
             hash_match_name = matches[0]["name"]
             hash_match_confidence = matches[0]["confidence"]
             hash_match_image = matches[0].get("image_url", "")
 
-    warped_b64 = _img_to_b64(warped, quality=70)
-
-
     return {
         "mode": "detected",
-        "debug_image": debug_b64,
+        "debug_image": warped_b64,
         "warped_image": warped_b64,
         "hash_match_name": hash_match_name,
         "hash_match_confidence": hash_match_confidence,
@@ -462,7 +461,7 @@ async def scan_card(
     file: UploadFile = File(...),
     rotation: int = Form(default=0),
 ):
-    """Detect card, match via image hash (primary) or OCR (fallback)."""
+    """Match card from overlay crop — no card detection needed."""
     contents = await file.read()
     if not contents:
         raise HTTPException(status_code=400, detail="Empty file")
@@ -474,28 +473,19 @@ async def scan_card(
     if rotation:
         img_cv = _apply_rotation(img_cv, rotation)
 
-    pts = _detect_card(img_cv)
-    if pts is None:
-        raise HTTPException(
-            status_code=422,
-            detail="Carta non rilevata nell'immagine. Assicurati che la carta sia ben visibile su uno sfondo contrastante.",
-        )
+    # Frontend sends card-shaped crop — just resize, no card detection
+    warped = cv2.resize(img_cv, (WARP_W, WARP_H))
 
-    warped = _warp_card(img_cv, pts)
-
-    # --- Strategy 1: Image hash matching (primary) ---
+    # --- Strategy 1: Image matching (hash + embedding) ---
     hash_matches = []
     if is_index_available():
         all_matches = match_artwork(warped, top_n=10)
-        # Keep only matches with reasonable confidence (>30%)
-        # and don't show garbage results far below the best match
         if all_matches:
             best_dist = all_matches[0]["distance"]
             hash_matches = [
                 m for m in all_matches
                 if m["confidence"] > 0.3 and m["distance"] <= best_dist * 1.5
             ]
-            # Always keep at least the best match
             if not hash_matches:
                 hash_matches = all_matches[:1]
 
@@ -517,13 +507,14 @@ async def scan_card(
 
         extracted = f"[Image Match] {hash_matches[0]['name']} ({hash_matches[0]['confidence']:.0%})"
     else:
-        # --- Strategy 2: OCR fallback ---
-        card_name_raw = _ocr_zone(warped, CARD_NAME_ZONE, is_set_code=False)
+        # --- Strategy 2: OCR fallback on the warped card ---
+        warped_hires = cv2.resize(img_cv, (WARP_W * HIRES_SCALE, WARP_H * HIRES_SCALE))
+        card_name_raw = _ocr_zone(warped_hires, CARD_NAME_ZONE, is_set_code=False)
         card_name = _clean_card_name(card_name_raw)
         if not card_name:
             raise HTTPException(
                 status_code=422,
-                detail="Carta rilevata ma impossibile identificarla. Prova con piu' luce.",
+                detail="Impossibile identificare la carta. Prova a posizionarla meglio nell'overlay.",
             )
 
         results = await _fuzzy_search(card_name)
