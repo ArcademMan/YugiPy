@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from ..database import get_db
 from ..models import Card
+from .settings import _load as load_settings
 
 router = APIRouter(prefix="/api/stats", tags=["stats"])
 
@@ -22,8 +23,18 @@ def get_stats(db: Session = Depends(get_db)):
     total_copies = sum(c.quantity for c in cards)
     distinct_card_ids = len({c.card_id for c in cards})
 
-    # --- Price helpers ---
+    # --- Price helpers (respect priceDisplay setting) ---
+    price_mode = load_settings().get("priceDisplay", "cm_median")
+
     def best_price(c):
+        if price_mode == "trend":
+            if c.price_cardmarket is not None:
+                return c.price_cardmarket
+        else:
+            preferred = {"cm_min": c.price_cm_min, "cm_avg": c.price_cm_avg, "cm_median": c.price_cm_median}.get(price_mode)
+            if preferred is not None:
+                return preferred
+        # Fallback chain
         for p in [c.price_cm_median, c.price_cm_avg, c.price_cm_min, c.price_cardmarket]:
             if p is not None:
                 return p
@@ -82,9 +93,15 @@ def get_stats(db: Session = Depends(get_db)):
 
     # --- Value by rarity ---
     value_by_rarity = Counter()
+    count_by_rarity = Counter()
     for c in cards:
         value_by_rarity[c.rarity] += best_price(c) * c.quantity
-    value_by_rarity = {k: round(v, 2) for k, v in value_by_rarity.most_common(15)}
+        count_by_rarity[c.rarity] += c.quantity
+    value_by_rarity_sorted = value_by_rarity.most_common(15)
+    value_by_rarity = {k: round(v, 2) for k, v in value_by_rarity_sorted}
+    count_by_rarity = {k: count_by_rarity[k] for k, _ in value_by_rarity_sorted}
+    avg_by_rarity = {k: round(value_by_rarity[k] / count_by_rarity[k], 2) if count_by_rarity[k] else 0 for k in value_by_rarity}
+    avg_by_rarity = dict(sorted(avg_by_rarity.items(), key=lambda x: x[1], reverse=True))
 
     # --- Value by language ---
     value_by_lang = Counter()
@@ -166,6 +183,8 @@ def get_stats(db: Session = Depends(get_db)):
         },
         "top_valuable": top_valuable_data,
         "value_by_rarity": value_by_rarity,
+        "count_by_rarity": count_by_rarity,
+        "avg_by_rarity": avg_by_rarity,
         "value_by_lang": value_by_lang,
         "price_distribution": price_ranges,
         "atk_def_scatter": atk_def_data,

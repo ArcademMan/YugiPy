@@ -51,6 +51,9 @@ export const RARITY_OPTIONS = [
     "Duel Terminal Normal Parallel Rare","Duel Terminal Rare Parallel Rare",
     "Duel Terminal Super Parallel Rare","Duel Terminal Ultra Parallel Rare",
     "Super Parallel Rare","Ultra Parallel Rare","Ultra Rare (Pharaoh's Rare)",
+    "Millennium Gold Rare", "Millenium Rare",
+    "Kaiba Corporation Common", "Kaiba Corporation Rare",
+    "Kaiba Corporation Ultra Rare", "Holographic"
 ];
 
 export const LANG_FLAGS = { IT: "it", EN: "gb", FR: "fr", DE: "de", ES: "es", PT: "pt", JA: "jp", KO: "kr" };

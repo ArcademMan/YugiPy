@@ -63,12 +63,15 @@ function updateCollectionFilters(cards) {
 
     const levels = [...new Set(cards.map((c) => c.level).filter((l) => l != null))].sort((a, b) => a - b);
     _rebuildFilterSelect("filter-level", "levels", levels.map(String));
+
+    const locations = [...new Set(cards.flatMap((c) => c.location || []))].sort();
+    _rebuildFilterSelect("filter-location", "locations", locations);
 }
 
 ["filter-rarity", "filter-condition", "filter-lang"].forEach((id) => {
     document.getElementById(id).addEventListener("change", loadCollection);
 });
-["filter-archetype", "filter-set", "filter-type", "filter-level"].forEach((id) => {
+["filter-archetype", "filter-set", "filter-type", "filter-level", "filter-location"].forEach((id) => {
     document.getElementById(id).addEventListener("change", applyLocalFilters);
 });
 
@@ -78,6 +81,7 @@ function applyLocalFilters() {
     const set = document.getElementById("filter-set").value;
     const type = document.getElementById("filter-type").value;
     const level = document.getElementById("filter-level").value;
+    const location = document.getElementById("filter-location").value;
 
     const cards = allCollectionCards.filter((c) => {
         if (q && !c.name.toLowerCase().includes(q) && !(c.set_code && c.set_code.toLowerCase().includes(q))) return false;
@@ -85,6 +89,7 @@ function applyLocalFilters() {
         if (set && !(c.set_code || "").startsWith(set + "-") && !(c.set_code || "").startsWith(set)) return false;
         if (type && (TYPE_GROUP[c.type] || c.type) !== type) return false;
         if (level && c.level !== parseInt(level)) return false;
+        if (location && !(c.location || []).includes(location)) return false;
         return true;
     });
     renderCollection(cards);

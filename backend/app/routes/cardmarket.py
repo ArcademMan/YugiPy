@@ -177,7 +177,7 @@ async def _send_scrape(card_db_id: int, url: str, card: Card) -> dict:
 
 
 async def _scrape_one(card_db_id: int, card: Card, db: Session) -> dict:
-    """Scrape card price. If no offers found for the desired language, retry with language filter."""
+    """Scrape card price. Always applies language filter to get accurate condition prices."""
     from ..cardmarket_maps import get_cardmarket_url, _LANG_MAP
 
     url = get_cardmarket_url(card, db)
@@ -193,23 +193,20 @@ async def _scrape_one(card_db_id: int, card: Card, db: Session) -> dict:
     if result.get("not_found"):
         return {"error": "not_found"}
 
-    # Check if we got offers matching the card's language
-    offers = result.get("offers", [])
-    has_lang_offers = any(o.get("lang") == card.lang for o in offers)
-
-    if not has_lang_offers and card.lang and result.get("pageUrl"):
-        # Retry with language filter on the actual card page URL
+    # Always retry with language filter so offers are pre-filtered by Cardmarket,
+    # ensuring the correct condition appears in the first page of results.
+    if card.lang and result.get("pageUrl"):
         lang_id = _LANG_MAP.get(card.lang)
         if lang_id:
             page_url = result["pageUrl"].split("?")[0]
-            retry_url = f"{page_url}?language={lang_id}"
-            LOG.info("No %s offers found, retrying with language filter: %s", card.lang, retry_url)
-            retry_result = await _send_scrape(card_db_id, retry_url, card)
+            lang_url = f"{page_url}?language={lang_id}"
+            LOG.info("Fetching %s offers with language filter: %s", card.lang, lang_url)
+            lang_result = await _send_scrape(card_db_id, lang_url, card)
 
-            if not retry_result.get("error") and not retry_result.get("cloudflare") and not retry_result.get("not_found"):
-                # Merge: keep trend from first result, offers from retry
-                retry_result["trend"] = retry_result.get("trend") or result.get("trend")
-                result = retry_result
+            if not lang_result.get("error") and not lang_result.get("cloudflare") and not lang_result.get("not_found"):
+                # Keep trend from first result, offers from language-filtered result
+                lang_result["trend"] = lang_result.get("trend") or result.get("trend")
+                result = lang_result
 
     return _process_result(card, result, db)
 

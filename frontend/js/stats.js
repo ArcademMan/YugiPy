@@ -179,7 +179,10 @@ export async function loadStats() {
         _doughnut("chart-race", Object.keys(dist.race), Object.values(dist.race));
 
         // Bar charts
-        _horizontalBar("chart-value-rarity", Object.keys(stats.value_by_rarity), Object.values(stats.value_by_rarity));
+        const rarityLabels = Object.keys(stats.value_by_rarity).map(k => `${k} (${stats.count_by_rarity[k] || 0})`);
+        _horizontalBar("chart-value-rarity", rarityLabels, Object.values(stats.value_by_rarity));
+        const avgRarityLabels = Object.keys(stats.avg_by_rarity).map(k => `${k} (${stats.count_by_rarity[k] || 0})`);
+        _horizontalBar("chart-avg-rarity", avgRarityLabels, Object.values(stats.avg_by_rarity));
         _horizontalBar("chart-value-lang", Object.keys(stats.value_by_lang), Object.values(stats.value_by_lang));
         _bar("chart-price-dist", Object.keys(stats.price_distribution), Object.values(stats.price_distribution), "#7c5cfc");
         _bar("chart-level", Object.keys(dist.level).map(l => `Lv ${l}`), Object.values(dist.level), "#3b82f6");
