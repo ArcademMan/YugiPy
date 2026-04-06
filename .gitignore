@@ -71,6 +71,7 @@ build/
 dist/
 installer_output/
 *.spec
+!launcher.spec
 *.exe
 *.msi
 *.dmg
