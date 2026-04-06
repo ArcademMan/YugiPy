@@ -182,40 +182,65 @@ def reload_index():
 # CLIP embedding matching
 # =============================================================
 
-_CLIP_MODEL = None
-_CLIP_PREPROCESS = None
+_CLIP_SESSION = None
 _EMB_INDEX: dict | None = None
 
+CLIP_ONNX_PATH = DATA_DIR / "clip_visual.onnx"
 
-CLIP_CHECKPOINT = DATA_DIR / "clip_yugioh.pth"
+# CLIP ViT-L-14 preprocessing constants (matches open_clip's preprocess)
+_CLIP_INPUT_SIZE = 224
+_CLIP_MEAN = np.array([0.5, 0.5, 0.5], dtype=np.float32)
+_CLIP_STD = np.array([0.5, 0.5, 0.5], dtype=np.float32)
 
 
-def _get_clip_model():
-    """Lazy-load CLIP model, with fine-tuned weights if available."""
-    global _CLIP_MODEL, _CLIP_PREPROCESS
-    if _CLIP_MODEL is None:
+def _get_clip_session():
+    """Lazy-load CLIP visual encoder as ONNX session."""
+    global _CLIP_SESSION
+    if _CLIP_SESSION is None:
+        if not CLIP_ONNX_PATH.exists():
+            print(f"[hash_matcher] ONNX model not found at {CLIP_ONNX_PATH}")
+            return None
         try:
-            import open_clip
-            import torch
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-            model, _, preprocess = open_clip.create_model_and_transforms(
-                "ViT-L-14", pretrained="laion2b_s32b_b82k", device=device
-            )
-
-            # Load fine-tuned weights if available
-            if CLIP_CHECKPOINT.exists():
-                ckpt = torch.load(str(CLIP_CHECKPOINT), map_location=device, weights_only=False)
-                model.visual.load_state_dict(ckpt["visual_state_dict"])
-                print(f"[hash_matcher] CLIP fine-tuned weights loaded (epoch {ckpt.get('epoch', '?')})")
-
-            model.eval()
-            _CLIP_MODEL = (model, device)
-            _CLIP_PREPROCESS = preprocess
-            print(f"[hash_matcher] CLIP model loaded on {device}")
+            import onnxruntime as ort
+            available = ort.get_available_providers()
+            if "CUDAExecutionProvider" in available:
+                providers = ["CUDAExecutionProvider", "CPUExecutionProvider"]
+            else:
+                providers = ["CPUExecutionProvider"]
+            _CLIP_SESSION = ort.InferenceSession(str(CLIP_ONNX_PATH), providers=providers)
+            active = _CLIP_SESSION.get_providers()
+            print(f"[hash_matcher] CLIP ONNX loaded (providers: {active})")
         except Exception as e:
-            print(f"[hash_matcher] Failed to load CLIP: {e}")
-            return None, None
-    return _CLIP_MODEL, _CLIP_PREPROCESS
+            print(f"[hash_matcher] Failed to load CLIP ONNX: {e}")
+            return None
+    return _CLIP_SESSION
+
+
+def _clip_preprocess(artwork_cv: np.ndarray) -> np.ndarray:
+    """Replicate CLIP preprocessing: resize, center-crop, normalize."""
+    # BGR to RGB
+    img = cv2.cvtColor(artwork_cv, cv2.COLOR_BGR2RGB)
+
+    # Resize shortest side to 224, bicubic
+    h, w = img.shape[:2]
+    if h < w:
+        new_h, new_w = _CLIP_INPUT_SIZE, int(w * _CLIP_INPUT_SIZE / h)
+    else:
+        new_h, new_w = int(h * _CLIP_INPUT_SIZE / w), _CLIP_INPUT_SIZE
+    img = cv2.resize(img, (new_w, new_h), interpolation=cv2.INTER_CUBIC)
+
+    # Center crop to 224x224
+    y0 = (new_h - _CLIP_INPUT_SIZE) // 2
+    x0 = (new_w - _CLIP_INPUT_SIZE) // 2
+    img = img[y0:y0 + _CLIP_INPUT_SIZE, x0:x0 + _CLIP_INPUT_SIZE]
+
+    # To float32 [0, 1], then normalize
+    arr = img.astype(np.float32) / 255.0
+    arr = (arr - _CLIP_MEAN) / _CLIP_STD
+
+    # HWC -> CHW, add batch dim
+    arr = np.transpose(arr, (2, 0, 1))[np.newaxis, ...]
+    return arr
 
 
 def _load_embedding_index() -> dict:
@@ -247,23 +272,19 @@ def _get_embedding_index():
 
 
 def _compute_query_embedding(artwork_cv: np.ndarray) -> np.ndarray | None:
-    """Compute L2-normalized CLIP embedding for a query artwork."""
-    clip_info, preprocess = _get_clip_model()
-    if clip_info is None:
+    """Compute L2-normalized CLIP embedding for a query artwork via ONNX."""
+    session = _get_clip_session()
+    if session is None:
         return None
 
-    model, device = clip_info
-    import torch
+    inp = _clip_preprocess(artwork_cv)
+    emb = session.run(None, {"image": inp})[0]
 
-    # Convert BGR OpenCV to PIL RGB
-    artwork_pil = Image.fromarray(cv2.cvtColor(artwork_cv, cv2.COLOR_BGR2RGB))
-    inp = preprocess(artwork_pil).unsqueeze(0).to(device)
-
-    with torch.no_grad():
-        emb = model.encode_image(inp)
-        emb = emb / emb.norm(dim=-1, keepdim=True)
-
-    vec = emb.cpu().numpy().flatten().astype(np.float32)
+    # L2 normalize
+    vec = emb.flatten().astype(np.float32)
+    norm = np.linalg.norm(vec)
+    if norm > 0:
+        vec = vec / norm
     return vec
 
 

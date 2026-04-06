@@ -65,6 +65,24 @@ def save_settings(settings: dict):
         json.dumps(settings, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
+def _deploy_bundled_data():
+    """Copy bundled data files (ONNX model, hash DB) to APPDATA on first run."""
+    if not getattr(sys, 'frozen', False):
+        return  # dev mode — files already in APPDATA
+    bundled_data = BUNDLE_DIR / "data"
+    if not bundled_data.exists():
+        return
+    import shutil
+    data_dir = SETTINGS_DIR / "data"
+    data_dir.mkdir(parents=True, exist_ok=True)
+    for filename in ("clip_visual.onnx", "card_hashes.db"):
+        src = bundled_data / filename
+        dst = data_dir / filename
+        if src.exists() and not dst.exists():
+            LOG.info("Deploying bundled %s to %s", filename, dst)
+            shutil.copy2(str(src), str(dst))
+
+
 def _get_local_ip() -> str:
     try:
         s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -729,6 +747,8 @@ def main():
     if "--server" in sys.argv:
         _run_server()
         return
+
+    _deploy_bundled_data()
 
     mutex = _acquire_single_instance()
     if mutex is None:
