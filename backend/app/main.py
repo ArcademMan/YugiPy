@@ -35,7 +35,7 @@ async def lifespan(app: FastAPI):
         await server.wait_closed()
 
 
-app = FastAPI(title="YugiPy", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="YugiPy", version="1.1.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
