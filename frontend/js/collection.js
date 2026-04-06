@@ -534,7 +534,7 @@ document.getElementById("modal-delete").addEventListener("click", async () => {
 document.getElementById("modal-split").addEventListener("click", () => {
     if (!currentModalCard) return;
     const card = currentModalCard;
-    document.getElementById("split-info").textContent =
+    document.getElementById("split-info").innerHTML =
         `${card.name} \u2014 currently x${card.quantity} (${card.rarity}, ${card.condition}) ${langFlag(card.lang)}`;
     document.getElementById("split-qty").value = 1;
     document.getElementById("split-qty").max = card.quantity - 1;
@@ -543,6 +543,7 @@ document.getElementById("modal-split").addEventListener("click", () => {
     splitRarity.value = card.rarity;
     document.getElementById("split-condition").value = card.condition;
     document.getElementById("split-lang").value = card.lang;
+    document.getElementById("split-set-code").value = card.set_code || "";
     document.getElementById("split-modal").hidden = false;
 });
 
@@ -552,11 +553,12 @@ document.getElementById("split-confirm").addEventListener("click", async () => {
     const rarity = document.getElementById("split-rarity").value;
     const condition = document.getElementById("split-condition").value;
     const lang = document.getElementById("split-lang").value;
+    const setCode = document.getElementById("split-set-code").value.trim() || null;
     try {
         const resp = await fetch(`${API}/api/cards/${currentModalCardId}/split`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ quantity: qty, rarity, condition, lang }),
+            body: JSON.stringify({ quantity: qty, rarity, condition, lang, set_code: setCode }),
         });
         if (resp.ok) {
             showToast("Card split!");
@@ -571,27 +573,28 @@ document.getElementById("split-confirm").addEventListener("click", async () => {
 });
 
 // --- Close modals ---
-document.querySelectorAll(".modal-close").forEach((btn) => {
-    btn.addEventListener("click", async () => {
-        const modal = btn.closest(".modal");
-        modal.hidden = true;
-        if (modal.id === "card-modal") {
-            await Promise.all(pendingModalSaves);
+function _handleModalClose(modal) {
+    modal.hidden = true;
+    if (modal.id === "card-modal") {
+        Promise.all(pendingModalSaves).then(() => {
             pendingModalSaves.length = 0;
             loadCollection();
-        }
+        });
+    }
+    if (modal.id === "add-modal" && document.getElementById("view-scanner").classList.contains("active")) {
+        import("./scanner.js").then(m => { m.resetScanner(); });
+    }
+}
+
+document.querySelectorAll(".modal-close").forEach((btn) => {
+    btn.addEventListener("click", () => {
+        _handleModalClose(btn.closest(".modal"));
     });
 });
 
 document.querySelectorAll(".modal-backdrop").forEach((backdrop) => {
-    backdrop.addEventListener("click", async () => {
-        const modal = backdrop.closest(".modal");
-        modal.hidden = true;
-        if (modal.id === "card-modal") {
-            await Promise.all(pendingModalSaves);
-            pendingModalSaves.length = 0;
-            loadCollection();
-        }
+    backdrop.addEventListener("click", () => {
+        _handleModalClose(backdrop.closest(".modal"));
     });
 });
 
@@ -685,11 +688,20 @@ document.getElementById("add-modal-confirm").addEventListener("click", async () 
             localStorage.setItem("yugipy_last_lang", lang);
             localStorage.setItem("yugipy_last_condition", condition);
             showToast("Card added to collection!");
+            // Save training crop if available (from scanner)
+            import("./scanner.js").then(m => {
+                const crop = m.getLastScanCrop();
+                if (crop && pendingCardData.card_id) {
+                    const form = new FormData();
+                    form.append("file", crop, "crop.jpg");
+                    form.append("card_id", String(pendingCardData.card_id));
+                    fetch(`${API}/api/save-training-crop`, { method: "POST", body: form }).catch(() => {});
+                }
+            });
             document.getElementById("add-modal").hidden = true;
             loadCollection();
             if (document.getElementById("view-scanner").classList.contains("active")
                 || !document.querySelector(".view.active")) {
-                // Will be handled by scanner module's switchToView
                 import("./scanner.js").then(m => { m.switchToScanner(); });
             }
         } else {

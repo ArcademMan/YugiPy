@@ -479,9 +479,7 @@ main {
 }
 
 #camera-overlay .card-guide {
-    /* Card aspect ratio: 59/86 ≈ 0.686 */
-    width: 55%;
-    aspect-ratio: 59 / 86;
+    position: absolute;
     border: 2px solid rgba(255, 255, 255, 0.6);
     border-radius: 8px;
     box-shadow: 0 0 0 9999px rgba(0, 0, 0, 0.4);
@@ -1854,23 +1852,130 @@ main {
 
 /* ==================== BOOK ==================== */
 
+/* Book two-column layout */
+.book-layout {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+}
+
 .book-settings-panel {
-    margin-bottom: 16px;
+    flex: 0 0 260px;
     background: var(--bg-raised);
     border: 1px solid var(--border);
     border-radius: var(--radius-md);
+    position: sticky;
+    top: 16px;
+    max-height: calc(100vh - 100px);
+    overflow-y: auto;
 }
 
-.book-settings-panel summary {
-    padding: 10px 14px;
-    font-size: 0.85rem;
-    font-weight: 600;
-    cursor: pointer;
-    color: var(--text-muted);
+.book-settings-toggle {
+    display: none;
 }
 
 .book-settings-body {
-    padding: 0 14px 14px;
+    padding: 14px;
+}
+
+.book-main {
+    flex: 1;
+    min-width: 0;
+}
+
+@media (max-width: 900px) {
+    .book-layout {
+        flex-direction: column;
+    }
+    .book-settings-panel {
+        flex: none;
+        width: 100%;
+        position: static;
+        max-height: none;
+        overflow-y: visible;
+    }
+    .book-settings-toggle {
+        display: block;
+    }
+    .book-settings-summary {
+        display: block;
+        padding: 10px 14px;
+        font-size: 0.85rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--text-muted);
+    }
+    .book-settings-body {
+        display: none;
+        padding: 0 14px 14px;
+    }
+    .book-settings-panel.open .book-settings-body {
+        display: block;
+    }
+}
+
+/* Sort rules list */
+.sort-rules-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 6px;
+}
+.sort-rule-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 6px;
+    background: var(--bg-base);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    cursor: grab;
+    transition: opacity 0.15s;
+}
+.sort-rule-row.dragging {
+    opacity: 0.4;
+}
+.sort-rule-grip {
+    color: var(--text-muted);
+    font-size: 1rem;
+    line-height: 1;
+    user-select: none;
+}
+.sort-rule-select {
+    flex: 1;
+    padding: 5px 8px;
+    font-size: 0.8rem;
+    background: var(--bg-raised);
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    appearance: auto;
+}
+.sort-rule-remove {
+    background: none;
+    border: none;
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    cursor: pointer;
+    padding: 0 4px;
+    line-height: 1;
+}
+.sort-rule-remove:hover {
+    color: var(--danger, #ef4444);
+}
+.btn-add-rule {
+    background: none;
+    border: 1px dashed var(--border);
+    color: var(--text-muted);
+    font-size: 0.8rem;
+    padding: 4px 10px;
+    border-radius: 6px;
+    cursor: pointer;
+    width: 100%;
+}
+.btn-add-rule:hover {
+    border-color: var(--accent);
+    color: var(--accent);
 }
 
 .book-checkbox-label {
@@ -2027,6 +2132,41 @@ main {
     font-weight: 600;
     margin-bottom: 14px;
     color: var(--text);
+}
+
+/* Tabbed chart cards */
+.stats-tabbed-card {
+    padding: 0;
+}
+.stats-tab-bar {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+}
+.stats-tab {
+    flex: 1;
+    padding: 10px 14px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: color 0.15s, border-color 0.15s;
+}
+.stats-tab:hover {
+    color: var(--text);
+}
+.stats-tab.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+}
+.stats-tab-panel {
+    display: none;
+    padding: 20px;
+}
+.stats-tab-panel.active {
+    display: block;
 }
 
 .stats-charts-grid {

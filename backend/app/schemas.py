@@ -50,6 +50,7 @@ class CardSplit(BaseModel):
     condition: str | None = None
     lang: str | None = None
     location: list[str] | None = None
+    set_code: str | None = None
 
 
 class CardResponse(CardBase):

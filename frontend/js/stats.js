@@ -249,3 +249,16 @@ export async function loadStats() {
         empty.hidden = false;
     }
 }
+
+// --- Tabbed chart cards ---
+document.querySelectorAll(".stats-tab-bar").forEach(bar => {
+    bar.querySelectorAll(".stats-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+            const card = bar.closest(".stats-tabbed-card");
+            card.querySelectorAll(".stats-tab").forEach(t => t.classList.remove("active"));
+            card.querySelectorAll(".stats-tab-panel").forEach(p => p.classList.remove("active"));
+            tab.classList.add("active");
+            card.querySelector(`#${tab.dataset.tab}`).classList.add("active");
+        });
+    });
+});

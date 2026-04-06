@@ -187,10 +187,12 @@
                 <span id="book-stats" class="stats-badge"></span>
             </div>
 
-            <details class="book-settings-panel">
-                <summary>Book Settings</summary>
-                <div class="book-settings-body">
-                    <div class="form-row">
+            <div class="book-layout">
+                <aside class="book-settings-panel">
+                    <div class="book-settings-toggle">
+                        <summary class="book-settings-summary">Book Settings</summary>
+                    </div>
+                    <div class="book-settings-body">
                         <div class="form-group">
                             <label for="book-group-by">Group by</label>
                             <select id="book-group-by">
@@ -201,17 +203,10 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="book-sort-by">Sort by</label>
-                            <select id="book-sort-by">
-                                <option value="rarity" selected>Rarity</option>
-                                <option value="name">Name</option>
-                                <option value="type">Type</option>
-                                <option value="set_code">Set code</option>
-                                <option value="price">Price</option>
-                            </select>
+                            <label>Sort rules <small>(drag to reorder)</small></label>
+                            <div id="book-sort-rules" class="sort-rules-list"></div>
+                            <button type="button" id="book-sort-add" class="btn-add-rule">+ Add rule</button>
                         </div>
-                    </div>
-                    <div class="form-row">
                         <div class="form-group">
                             <label for="book-grid-size">Cards per page</label>
                             <select id="book-grid-size">
@@ -231,8 +226,13 @@
                                 <option value="4">4</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="book-copies-mode">Count copies by</label>
+                            <select id="book-copies-mode">
+                                <option value="entry" selected>Exact card (set + rarity + lang)</option>
+                                <option value="name">Card name</option>
+                            </select>
+                        </div>
                         <div class="form-group">
                             <label for="book-filter-lang">Language</label>
                             <select id="book-filter-lang">
@@ -259,8 +259,6 @@
                                 <option value="Played">Played</option>
                             </select>
                         </div>
-                    </div>
-                    <div class="form-row">
                         <div class="form-group">
                             <label for="book-filter-set">Filter set</label>
                             <select id="book-filter-set">
@@ -268,27 +266,28 @@
                             </select>
                         </div>
                         <div class="form-group">
-                            <label for="book-min-price">Min price (€)</label>
+                            <label for="book-min-price">Min price (&euro;)</label>
                             <input type="number" id="book-min-price" value="0" min="0" step="0.5" style="width:100%">
                         </div>
+                        <label class="book-checkbox-label">
+                            <input type="checkbox" id="book-new-page" checked>
+                            Separate groups on new page
+                        </label>
+                        <label class="book-checkbox-label">
+                            <input type="checkbox" id="book-show-prices">
+                            Show prices on cards
+                        </label>
                     </div>
-                    <label class="book-checkbox-label">
-                        <input type="checkbox" id="book-new-page" checked>
-                        Separate groups on new page
-                    </label>
-                    <label class="book-checkbox-label">
-                        <input type="checkbox" id="book-show-prices">
-                        Show prices on cards
-                    </label>
+                </aside>
+
+                <div class="book-main">
+                    <div id="book-spread" class="book-spread"></div>
+                    <div class="book-nav">
+                        <button id="book-prev" class="btn-secondary">&larr;</button>
+                        <span id="book-page-num"></span>
+                        <button id="book-next" class="btn-secondary">&rarr;</button>
+                    </div>
                 </div>
-            </details>
-
-            <div id="book-spread" class="book-spread"></div>
-
-            <div class="book-nav">
-                <button id="book-prev" class="btn-secondary">&larr;</button>
-                <span id="book-page-num"></span>
-                <button id="book-next" class="btn-secondary">&rarr;</button>
             </div>
         </section>
 
@@ -373,13 +372,17 @@
                 </div>
 
                 <div class="stats-charts-grid stats-charts-wide">
-                    <div class="stats-section-card">
-                        <h3>Value by Rarity</h3>
-                        <div class="chart-container chart-wide"><canvas id="chart-value-rarity"></canvas></div>
-                    </div>
-                    <div class="stats-section-card">
-                        <h3>Avg Value by Rarity</h3>
-                        <div class="chart-container chart-wide"><canvas id="chart-avg-rarity"></canvas></div>
+                    <div class="stats-section-card stats-tabbed-card">
+                        <div class="stats-tab-bar">
+                            <button class="stats-tab active" data-tab="tab-value-rarity">Value by Rarity</button>
+                            <button class="stats-tab" data-tab="tab-avg-rarity">Avg Value by Rarity</button>
+                        </div>
+                        <div class="stats-tab-panel active" id="tab-value-rarity">
+                            <div class="chart-container chart-wide"><canvas id="chart-value-rarity"></canvas></div>
+                        </div>
+                        <div class="stats-tab-panel" id="tab-avg-rarity">
+                            <div class="chart-container chart-wide"><canvas id="chart-avg-rarity"></canvas></div>
+                        </div>
                     </div>
                     <div class="stats-section-card">
                         <h3>Value by Language</h3>
@@ -567,11 +570,13 @@
                 <div class="form-group">
                     <label for="split-condition">New condition</label>
                     <select id="split-condition">
+                        <option value="Mint">Mint</option>
                         <option value="Near Mint">Near Mint</option>
-                        <option value="Lightly Played">Lightly Played</option>
-                        <option value="Moderately Played">Moderately Played</option>
-                        <option value="Heavily Played">Heavily Played</option>
-                        <option value="Damaged">Damaged</option>
+                        <option value="Excellent">Excellent</option>
+                        <option value="Good">Good</option>
+                        <option value="Light Played">Light Played</option>
+                        <option value="Played">Played</option>
+                        <option value="Poor">Poor</option>
                     </select>
                 </div>
                 <div class="form-group">
@@ -586,6 +591,11 @@
                         <option value="JA">日本語</option>
                         <option value="KO">한국어</option>
                     </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="split-set-code">Set code</label>
+                    <input type="text" id="split-set-code" class="form-input" placeholder="e.g. BLMR-IT065">
                 </div>
 
                 <button id="split-confirm" class="btn-primary btn-full">Split</button>

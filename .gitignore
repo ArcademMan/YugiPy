@@ -90,6 +90,8 @@ scan_zones.json
 backend/card_hashes.db
 backend/debug_*.jpg
 backend/debug_*.png
+_debug_*.jpg
+backend/train_clip.py
 
 # ========================
 # Image index (large, regenerable)
@@ -130,3 +132,5 @@ htmlcov/
 .coverage
 /assets/flags
 yugipy-price-sync.zip
+backend/train_clip.py
+_debug_query_artwork.jpg

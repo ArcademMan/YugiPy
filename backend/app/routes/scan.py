@@ -481,13 +481,22 @@ async def scan_card(
     if is_index_available():
         all_matches = match_artwork(warped, top_n=10)
         if all_matches:
-            best_dist = all_matches[0]["distance"]
-            hash_matches = [
-                m for m in all_matches
-                if m["confidence"] > 0.3 and m["distance"] <= best_dist * 1.5
-            ]
-            if not hash_matches:
+            top5 = [(m["name"], round(m["confidence"], 4)) for m in all_matches[:5]]
+            print(f"[scan] top5: {top5}")
+            best_conf = all_matches[0]["confidence"]
+            # Only show other results if very close to top match
+            gap = best_conf - (all_matches[1]["confidence"] if len(all_matches) > 1 else 0)
+            if gap > 0.03:
+                # Clear winner — show only top match
                 hash_matches = all_matches[:1]
+            else:
+                # Ambiguous — show results within 0.02 of top
+                hash_matches = [all_matches[0]]
+                for m in all_matches[1:]:
+                    if m["confidence"] >= best_conf - 0.02:
+                        hash_matches.append(m)
+                    else:
+                        break
 
     # --- Build candidates ---
     candidates = []
@@ -525,6 +534,25 @@ async def scan_card(
         extracted_text=extracted,
         candidates=candidates,
     )
+
+
+@router.post("/save-training-crop")
+async def save_training_crop(file: UploadFile = File(...), card_id: int = Form(...)):
+    """Save a labeled camera crop for future training."""
+    from ..paths import DATA_DIR
+    import time as _time
+
+    capture_dir = DATA_DIR / "training_crops"
+    capture_dir.mkdir(exist_ok=True)
+
+    contents = await file.read()
+    if not contents:
+        return {"saved": False}
+
+    # Save as cardid_timestamp.jpg
+    filename = f"{card_id}_{int(_time.time() * 1000)}.jpg"
+    (capture_dir / filename).write_bytes(contents)
+    return {"saved": True}
 
 
 YGOPRODECK_SETS_API = "https://db.ygoprodeck.com/api/v7/cardsets.php"

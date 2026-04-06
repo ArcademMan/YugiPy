@@ -12,7 +12,118 @@ import { openCardModal } from "./collection.js";
 let bookPages = [];
 let bookCurrentSpread = 0;
 
+// ── Sort-rules UI ──────────────────────────────────────────
+const SORT_OPTIONS = [
+    { value: "rarity_desc",   label: "Rarity ↓" },
+    { value: "rarity_asc",    label: "Rarity ↑" },
+    { value: "name_asc",      label: "Name A→Z" },
+    { value: "name_desc",     label: "Name Z→A" },
+    { value: "type_asc",      label: "Type" },
+    { value: "level_desc",    label: "Level ↓" },
+    { value: "level_asc",     label: "Level ↑" },
+    { value: "set_code_asc",  label: "Set code A→Z" },
+    { value: "set_code_desc", label: "Set code Z→A" },
+    { value: "price_desc",    label: "Price ↓" },
+    { value: "price_asc",     label: "Price ↑" },
+    { value: "archetype_asc", label: "Archetype A→Z" },
+    { value: "archetype_desc",label: "Archetype Z→A" },
+];
+
+let sortRules = ["rarity_desc"];   // default
+
+function renderSortRules() {
+    const container = document.getElementById("book-sort-rules");
+    container.innerHTML = "";
+    sortRules.forEach((rule, idx) => {
+        const row = document.createElement("div");
+        row.className = "sort-rule-row";
+        row.draggable = true;
+        row.dataset.idx = idx;
+
+        const grip = document.createElement("span");
+        grip.className = "sort-rule-grip";
+        grip.textContent = "≡";
+
+        const select = document.createElement("select");
+        select.className = "sort-rule-select";
+        SORT_OPTIONS.forEach(opt => {
+            const o = document.createElement("option");
+            o.value = opt.value;
+            o.textContent = opt.label;
+            if (opt.value === rule) o.selected = true;
+            select.appendChild(o);
+        });
+        select.addEventListener("change", () => {
+            sortRules[idx] = select.value;
+            saveSortRules();
+            buildAndRenderBook();
+        });
+
+        const removeBtn = document.createElement("button");
+        removeBtn.type = "button";
+        removeBtn.className = "sort-rule-remove";
+        removeBtn.textContent = "×";
+        removeBtn.title = "Remove rule";
+        removeBtn.addEventListener("click", () => {
+            sortRules.splice(idx, 1);
+            if (sortRules.length === 0) sortRules.push("rarity_desc");
+            saveSortRules();
+            renderSortRules();
+            buildAndRenderBook();
+        });
+
+        row.append(grip, select, removeBtn);
+        container.appendChild(row);
+
+        // Drag & drop reordering
+        row.addEventListener("dragstart", (e) => {
+            e.dataTransfer.effectAllowed = "move";
+            e.dataTransfer.setData("text/plain", String(idx));
+            row.classList.add("dragging");
+        });
+        row.addEventListener("dragend", () => row.classList.remove("dragging"));
+        row.addEventListener("dragover", (e) => { e.preventDefault(); e.dataTransfer.dropEffect = "move"; });
+        row.addEventListener("drop", (e) => {
+            e.preventDefault();
+            const from = parseInt(e.dataTransfer.getData("text/plain"));
+            const to = idx;
+            if (from === to) return;
+            const [moved] = sortRules.splice(from, 1);
+            sortRules.splice(to, 0, moved);
+            saveSortRules();
+            renderSortRules();
+            buildAndRenderBook();
+        });
+    });
+}
+
+function saveSortRules() {
+    saveSetting("bookSortRules", sortRules);
+}
+
+function loadSortRules() {
+    const saved = _settings.bookSortRules;
+    if (Array.isArray(saved) && saved.length > 0) sortRules = saved;
+}
+
+let sortRulesInited = false;
+function initSortRulesUI() {
+    loadSortRules();
+    renderSortRules();
+    if (sortRulesInited) return;
+    sortRulesInited = true;
+    document.getElementById("book-sort-add").addEventListener("click", () => {
+        const used = new Set(sortRules);
+        const next = SORT_OPTIONS.find(o => !used.has(o.value));
+        sortRules.push(next ? next.value : "rarity_desc");
+        saveSortRules();
+        renderSortRules();
+        buildAndRenderBook();
+    });
+}
+
 export function loadBook() {
+    initSortRulesUI();
     if (allCollectionCards.length > 0) {
         buildAndRenderBook();
     } else {
@@ -45,7 +156,6 @@ function buildAndRenderBook() {
 
 function buildBookPages() {
     const groupBy = document.getElementById("book-group-by").value;
-    const sortBy = document.getElementById("book-sort-by").value;
     const newPagePerGroup = document.getElementById("book-new-page").checked;
     const gridSize = document.getElementById("book-grid-size").value;
     const [cols, rows] = gridSize.split("x").map(Number);
@@ -67,10 +177,23 @@ function buildBookPages() {
         return true;
     });
 
+    const copiesMode = document.getElementById("book-copies-mode").value;
     const expanded = [];
-    for (const card of filtered) {
-        const copies = maxCopies > 0 ? Math.min(card.quantity, maxCopies) : card.quantity;
-        for (let i = 0; i < copies; i++) expanded.push(card);
+    if (maxCopies > 0 && copiesMode === "name") {
+        const nameCount = new Map();
+        for (const card of filtered) {
+            const used = nameCount.get(card.name) || 0;
+            const remaining = maxCopies - used;
+            if (remaining <= 0) continue;
+            const copies = Math.min(card.quantity, remaining);
+            nameCount.set(card.name, used + copies);
+            for (let i = 0; i < copies; i++) expanded.push(card);
+        }
+    } else {
+        for (const card of filtered) {
+            const copies = maxCopies > 0 ? Math.min(card.quantity, maxCopies) : card.quantity;
+            for (let i = 0; i < copies; i++) expanded.push(card);
+        }
     }
 
     const groups = new Map();
@@ -93,18 +216,29 @@ function buildBookPages() {
         return a.localeCompare(b);
     });
 
+    const comparators = {
+        rarity_desc: (a, b) => (RARITY_ORDER[b.rarity] ?? -1) - (RARITY_ORDER[a.rarity] ?? -1),
+        rarity_asc:  (a, b) => (RARITY_ORDER[a.rarity] ?? -1) - (RARITY_ORDER[b.rarity] ?? -1),
+        name_asc:    (a, b) => a.name.localeCompare(b.name),
+        name_desc:   (a, b) => b.name.localeCompare(a.name),
+        type_asc:    (a, b) => (TYPE_ORDER[TYPE_GROUP[a.type] || a.type] ?? 99) - (TYPE_ORDER[TYPE_GROUP[b.type] || b.type] ?? 99),
+        level_desc:  (a, b) => (b.level ?? 0) - (a.level ?? 0),
+        level_asc:   (a, b) => (a.level ?? 0) - (b.level ?? 0),
+        set_code_asc:  (a, b) => (a.set_code || "").localeCompare(b.set_code || ""),
+        set_code_desc: (a, b) => (b.set_code || "").localeCompare(a.set_code || ""),
+        price_desc:  (a, b) => (getDisplayPrice(b).price || 0) - (getDisplayPrice(a).price || 0),
+        price_asc:   (a, b) => (getDisplayPrice(a).price || 0) - (getDisplayPrice(b).price || 0),
+        archetype_asc:  (a, b) => (a.archetype || "").localeCompare(b.archetype || ""),
+        archetype_desc: (a, b) => (b.archetype || "").localeCompare(a.archetype || ""),
+    };
     const sortFn = (a, b) => {
-        switch (sortBy) {
-            case "rarity": return (RARITY_ORDER[b.rarity] ?? -1) - (RARITY_ORDER[a.rarity] ?? -1);
-            case "name": return a.name.localeCompare(b.name);
-            case "type":
-                const aOrder = TYPE_ORDER[TYPE_GROUP[a.type] || a.type] ?? 99;
-                const bOrder = TYPE_ORDER[TYPE_GROUP[b.type] || b.type] ?? 99;
-                return aOrder - bOrder || (b.level ?? 0) - (a.level ?? 0) || a.name.localeCompare(b.name);
-            case "set_code": return (a.set_code || "").localeCompare(b.set_code || "");
-            case "price": return (getDisplayPrice(b).price || 0) - (getDisplayPrice(a).price || 0);
-            default: return 0;
+        for (const rule of sortRules) {
+            const cmp = comparators[rule];
+            if (!cmp) continue;
+            const result = cmp(a, b);
+            if (result !== 0) return result;
         }
+        return 0;
     };
 
     bookPages = [];
@@ -177,8 +311,13 @@ function renderBookPage(page) {
     return `<div class="book-page">${header}<div class="book-page-grid" style="grid-template-columns:repeat(${cols},1fr)">${slots}</div></div>`;
 }
 
+// Mobile settings toggle
+document.querySelector(".book-settings-summary")?.addEventListener("click", () => {
+    document.querySelector(".book-settings-panel").classList.toggle("open");
+});
+
 // Event listeners
-["book-group-by", "book-sort-by", "book-new-page", "book-grid-size", "book-max-copies",
+["book-group-by", "book-new-page", "book-grid-size", "book-max-copies", "book-copies-mode",
  "book-filter-lang", "book-filter-condition", "book-filter-set", "book-min-price", "book-show-prices"
 ].forEach(id => {
     document.getElementById(id).addEventListener("change", buildAndRenderBook);
@@ -192,9 +331,9 @@ document.getElementById("book-next").addEventListener("click", () => {
 });
 
 // Persist preferences
-const BOOK_PREF_IDS = ["book-group-by", "book-sort-by", "book-new-page", "book-grid-size",
-    "book-max-copies", "book-filter-lang", "book-filter-condition", "book-filter-set",
-    "book-min-price", "book-show-prices"];
+const BOOK_PREF_IDS = ["book-group-by", "book-new-page", "book-grid-size",
+    "book-max-copies", "book-copies-mode", "book-filter-lang", "book-filter-condition",
+    "book-filter-set", "book-min-price", "book-show-prices"];
 
 function saveBookPrefs() {
     const prefs = {};

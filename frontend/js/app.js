@@ -10,19 +10,22 @@ import { loadStats } from "./stats.js";
 import { priceSelect, checkExtensionStatus } from "./settings.js";
 
 // --- Navigation ---
-document.querySelectorAll(".nav-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-        switchToView(btn.dataset.view);
+function navigateTo(viewId) {
+    switchToView(viewId);
+    localStorage.setItem("yugipy_activeView", viewId);
 
-        if (btn.dataset.view === "scanner") {
-            resetScanner();
-        } else {
-            stopCamera();
-            if (btn.dataset.view === "collection") loadCollection();
-            if (btn.dataset.view === "book") loadBook();
-            if (btn.dataset.view === "stats") loadStats();
-        }
-    });
+    if (viewId === "scanner") {
+        resetScanner();
+    } else {
+        stopCamera();
+        if (viewId === "collection") loadCollection();
+        if (viewId === "book") loadBook();
+        if (viewId === "stats") loadStats();
+    }
+}
+
+document.querySelectorAll(".nav-btn").forEach((btn) => {
+    btn.addEventListener("click", () => navigateTo(btn.dataset.view));
 });
 
 // --- Init ---
@@ -30,6 +33,13 @@ document.querySelectorAll(".nav-btn").forEach((btn) => {
     await shared.loadSettings();
     priceSelect.value = shared.priceDisplayMode;
     loadBookPrefs();
-    loadCollection();
+
+    const saved = localStorage.getItem("yugipy_activeView");
+    if (saved && document.getElementById(`view-${saved}`)) {
+        navigateTo(saved);
+    } else {
+        loadCollection();
+    }
+
     checkExtensionStatus();
 })();

@@ -202,10 +202,11 @@ def split_card(card_db_id: int, payload: CardSplit, db: Session = Depends(get_db
     new_condition = payload.condition if payload.condition is not None else source.condition
     new_lang = payload.lang if payload.lang is not None else source.lang
     new_location = payload.location if payload.location is not None else source.location
+    new_set_code = payload.set_code if payload.set_code is not None else source.set_code
 
     # Check if the split would create an identical card
     if (new_rarity == source.rarity and new_condition == source.condition
-            and new_lang == source.lang):
+            and new_lang == source.lang and new_set_code == source.set_code):
         raise HTTPException(
             status_code=400,
             detail="Devi cambiare almeno un attributo (rarità, condizione o lingua)",
@@ -221,6 +222,7 @@ def split_card(card_db_id: int, payload: CardSplit, db: Session = Depends(get_db
             Card.rarity == new_rarity,
             Card.condition == new_condition,
             Card.lang == new_lang,
+            Card.set_code == new_set_code,
         )
     ).first()
 
@@ -250,6 +252,7 @@ def split_card(card_db_id: int, payload: CardSplit, db: Session = Depends(get_db
             rarity=new_rarity,
             condition=new_condition,
             lang=new_lang,
+            set_code=new_set_code,
             location=new_location,
         )
         db.add(new_card)

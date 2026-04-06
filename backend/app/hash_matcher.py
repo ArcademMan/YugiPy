@@ -187,8 +187,11 @@ _CLIP_PREPROCESS = None
 _EMB_INDEX: dict | None = None
 
 
+CLIP_CHECKPOINT = DATA_DIR / "clip_yugioh.pth"
+
+
 def _get_clip_model():
-    """Lazy-load CLIP model."""
+    """Lazy-load CLIP model, with fine-tuned weights if available."""
     global _CLIP_MODEL, _CLIP_PREPROCESS
     if _CLIP_MODEL is None:
         try:
@@ -198,6 +201,13 @@ def _get_clip_model():
             model, _, preprocess = open_clip.create_model_and_transforms(
                 "ViT-B-32", pretrained="laion2b_s34b_b79k", device=device
             )
+
+            # Load fine-tuned weights if available
+            if CLIP_CHECKPOINT.exists():
+                ckpt = torch.load(str(CLIP_CHECKPOINT), map_location=device, weights_only=False)
+                model.visual.load_state_dict(ckpt["visual_state_dict"])
+                print(f"[hash_matcher] CLIP fine-tuned weights loaded (epoch {ckpt.get('epoch', '?')})")
+
             model.eval()
             _CLIP_MODEL = (model, device)
             _CLIP_PREPROCESS = preprocess

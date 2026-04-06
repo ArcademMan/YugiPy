@@ -74,6 +74,8 @@ async function startCamera() {
                 video.classList.remove("video-rotate-fix");
                 container.style.height = "";
             }
+            // Position guide overlay after layout settles
+            requestAnimationFrame(() => _updateGuideOverlay());
         }, { once: true });
         startPreviewLoop();
     } catch (e) {
@@ -124,16 +126,67 @@ document.querySelectorAll(".rot-btn").forEach((btn) => {
 });
 
 const CARD_RATIO = 59 / 86; // width / height
-const GUIDE_WIDTH_FRAC = 0.55; // fraction of container width
+const GUIDE_WIDTH_FRAC = 0.55; // fraction of video for crop
 
-function _cropGuideRegion(video) {
-    // Calculate the guide rectangle in video pixel coordinates.
-    // The guide is centered, 55% of the displayed width, aspect ratio 59:86.
+function _updateGuideOverlay() {
+    const video = document.getElementById("camera-feed");
+    const guide = document.querySelector("#camera-overlay .card-guide");
+    if (!video || !guide || video.videoWidth === 0) return;
+
+    const container = document.getElementById("camera-container");
+    const cw = container.clientWidth;
+    const ch = container.clientHeight;
     const vw = video.videoWidth;
     const vh = video.videoHeight;
 
-    const cropW = Math.round(vw * GUIDE_WIDTH_FRAC);
-    const cropH = Math.round(cropW / CARD_RATIO);
+    // How the video is displayed with object-fit:contain
+    const videoAspect = vw / vh;
+    const containerAspect = cw / ch;
+    let displayW, displayH, offsetX, offsetY;
+    if (videoAspect > containerAspect) {
+        // Video wider than container — letterboxed top/bottom
+        displayW = cw;
+        displayH = cw / videoAspect;
+        offsetX = 0;
+        offsetY = (ch - displayH) / 2;
+    } else {
+        // Video taller — pillarboxed left/right
+        displayH = ch;
+        displayW = ch * videoAspect;
+        offsetX = (cw - displayW) / 2;
+        offsetY = 0;
+    }
+
+    // Guide: same proportions as crop (GUIDE_WIDTH_FRAC of video, card aspect ratio)
+    let guideW = displayW * GUIDE_WIDTH_FRAC;
+    let guideH = guideW / CARD_RATIO;
+    if (guideH > displayH * 0.85) {
+        guideH = displayH * 0.85;
+        guideW = guideH * CARD_RATIO;
+    }
+
+    guide.style.width = guideW + "px";
+    guide.style.height = guideH + "px";
+    guide.style.left = (offsetX + (displayW - guideW) / 2) + "px";
+    guide.style.top = (offsetY + (displayH - guideH) / 2) + "px";
+}
+
+function _cropGuideRegion(video) {
+    // Calculate the guide rectangle in video pixel coordinates.
+    // Fits card aspect ratio (59:86) within the video, centered.
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    // Try width-based sizing first
+    let cropW = Math.round(vw * GUIDE_WIDTH_FRAC);
+    let cropH = Math.round(cropW / CARD_RATIO);
+
+    // If height exceeds video, size by height instead
+    if (cropH > vh * 0.9) {
+        cropH = Math.round(vh * 0.85);
+        cropW = Math.round(cropH * CARD_RATIO);
+    }
+
     const cropX = Math.round((vw - cropW) / 2);
     const cropY = Math.round((vh - cropH) / 2);
 
@@ -268,6 +321,7 @@ document.getElementById("capture-btn").addEventListener("click", async () => {
     document.getElementById("scan-loading").hidden = false;
 
     cropped.toBlob(async (blob) => {
+        lastScanCrop = blob;  // save for training data
         const form = new FormData();
         form.append("file", blob, "scan.jpg");
         form.append("rotation", getRotation());
@@ -352,6 +406,11 @@ function showScanResults(data) {
         });
     }
 }
+
+// --- Save training crop when card is added ---
+let lastScanCrop = null;  // blob of the crop used for the last scan
+
+export function getLastScanCrop() { return lastScanCrop; }
 
 document.getElementById("back-to-camera").addEventListener("click", () => {
     switchToScanner();

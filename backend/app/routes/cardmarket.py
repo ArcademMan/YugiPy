@@ -103,6 +103,25 @@ def _calc_prices(prices: list[float]) -> dict:
     return {"min": p_min, "avg": p_avg, "median": p_median}
 
 
+def _has_condition_match(result: dict, card: Card) -> bool:
+    """Check if any offer in the result matches the card's condition (and language)."""
+    for offer in result.get("offers", []):
+        if offer.get("price") is None:
+            continue
+        if card.lang and offer.get("lang") and offer["lang"] != card.lang:
+            continue
+        if offer.get("condition") == card.condition:
+            return True
+    return False
+
+
+# Cardmarket minCondition parameter values
+_CONDITION_ID = {
+    "Mint": 1, "Near Mint": 2, "Excellent": 3, "Good": 4,
+    "Light Played": 5, "Played": 6, "Poor": 7,
+}
+
+
 def _process_result(card: Card, result: dict, db: Session) -> dict:
     """Process scraping result: extract trend and min/avg/median price, save to DB."""
     trend = result.get("trend")
@@ -207,6 +226,25 @@ async def _scrape_one(card_db_id: int, card: Card, db: Session) -> dict:
                 # Keep trend from first result, offers from language-filtered result
                 lang_result["trend"] = lang_result.get("trend") or result.get("trend")
                 result = lang_result
+
+    # If no offers match the card's condition, retry with minCondition filter
+    # so Cardmarket shows only offers of that condition or better.
+    if card.condition and not _has_condition_match(result, card) and result.get("pageUrl"):
+        cond_id = _CONDITION_ID.get(card.condition)
+        if cond_id:
+            page_url = result["pageUrl"].split("?")[0]
+            params = f"minCondition={cond_id}"
+            if card.lang:
+                lang_id = _LANG_MAP.get(card.lang)
+                if lang_id:
+                    params += f"&language={lang_id}"
+            cond_url = f"{page_url}?{params}"
+            LOG.info("No %s offers found, retrying with condition filter: %s", card.condition, cond_url)
+            cond_result = await _send_scrape(card_db_id, cond_url, card)
+
+            if not cond_result.get("error") and not cond_result.get("cloudflare") and not cond_result.get("not_found"):
+                cond_result["trend"] = cond_result.get("trend") or result.get("trend")
+                result = cond_result
 
     return _process_result(card, result, db)
 
