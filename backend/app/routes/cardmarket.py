@@ -154,8 +154,11 @@ def _process_result(card: Card, result: dict, db: Session) -> dict:
     if trend is not None or calc["min"] is not None:
         from datetime import datetime, timezone
         card.price_updated_at = datetime.now(timezone.utc)
-        db.commit()
-        db.refresh(card)
+        try:
+            db.commit()
+            db.refresh(card)
+        except Exception:
+            db.rollback()
 
     return {
         "trend": trend,

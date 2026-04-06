@@ -48,7 +48,7 @@ def main():
     print(f"Device: {device}")
     print("Loading CLIP model...")
     model, _, preprocess = open_clip.create_model_and_transforms(
-        "ViT-B-32", pretrained="laion2b_s34b_b79k", device=device
+        "ViT-L-14", pretrained="laion2b_s32b_b82k", device=device
     )
     model.eval()
     print("CLIP model loaded.")

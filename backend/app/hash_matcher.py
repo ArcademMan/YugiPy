@@ -199,7 +199,7 @@ def _get_clip_model():
             import torch
             device = "cuda" if torch.cuda.is_available() else "cpu"
             model, _, preprocess = open_clip.create_model_and_transforms(
-                "ViT-B-32", pretrained="laion2b_s34b_b79k", device=device
+                "ViT-L-14", pretrained="laion2b_s32b_b82k", device=device
             )
 
             # Load fine-tuned weights if available
@@ -294,6 +294,8 @@ def _embedding_rerank(artwork_cv: np.ndarray, candidates: list[dict]) -> list[di
     return candidates
 
 
+MIN_EMBEDDING_CONFIDENCE = 0.70
+
 def _embedding_search(artwork_cv: np.ndarray, top_n: int = 10) -> list[dict]:
     """Brute-force CLIP embedding search across all cards."""
     emb_index = _get_embedding_index()
@@ -310,6 +312,10 @@ def _embedding_search(artwork_cv: np.ndarray, top_n: int = 10) -> list[dict]:
 
     top_indices = np.argsort(similarities)[::-1][:top_n]
 
+    # If the best match is below threshold, nothing meaningful was detected
+    if float(similarities[top_indices[0]]) < MIN_EMBEDDING_CONFIDENCE:
+        return []
+
     index, _, _ = _get_index()
     id_to_entry = {e.card_id: e for e in index}
 
@@ -317,6 +323,8 @@ def _embedding_search(artwork_cv: np.ndarray, top_n: int = 10) -> list[dict]:
     for idx in top_indices:
         card_id = card_ids[idx]
         sim = float(similarities[idx])
+        if sim < MIN_EMBEDDING_CONFIDENCE:
+            break
         entry = id_to_entry.get(card_id)
         if entry is None:
             continue

@@ -688,16 +688,6 @@ document.getElementById("add-modal-confirm").addEventListener("click", async () 
             localStorage.setItem("yugipy_last_lang", lang);
             localStorage.setItem("yugipy_last_condition", condition);
             showToast("Card added to collection!");
-            // Save training crop if available (from scanner)
-            import("./scanner.js").then(m => {
-                const crop = m.getLastScanCrop();
-                if (crop && pendingCardData.card_id) {
-                    const form = new FormData();
-                    form.append("file", crop, "crop.jpg");
-                    form.append("card_id", String(pendingCardData.card_id));
-                    fetch(`${API}/api/save-training-crop`, { method: "POST", body: form }).catch(() => {});
-                }
-            });
             document.getElementById("add-modal").hidden = true;
             loadCollection();
             if (document.getElementById("view-scanner").classList.contains("active")
