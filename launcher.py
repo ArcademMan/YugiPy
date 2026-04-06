@@ -203,49 +203,76 @@ def _apply_dark_theme(app: QApplication):
     app.setPalette(palette)
 
     app.setStyleSheet(textwrap.dedent("""\
-        QMainWindow { background: #1e1e1e; }
-        QMenu { background: #252526; color: #d4d4d4; border: 1px solid #333; }
+        QMainWindow { background: #161616; }
+        QMenu { background: #1e1e1e; color: #ccc; border: 1px solid #333; }
         QMenu::item:selected { background: #264f78; }
 
         QPushButton {
-            background: #2d2d2d; color: #d4d4d4; border: 1px solid #444;
-            border-radius: 6px; padding: 8px 20px; font-weight: 600; font-size: 10pt;
+            background: transparent; color: #999; border: 1px solid #333;
+            border-radius: 8px; padding: 8px 20px; font-weight: 500; font-size: 9pt;
         }
-        QPushButton:hover { background: #3a3a3a; }
-        QPushButton:pressed { background: #1a1a1a; }
-        QPushButton:disabled { color: #555; border-color: #333; }
+        QPushButton:hover { background: #1e1e1e; color: #ccc; border-color: #444; }
+        QPushButton:pressed { background: #111; }
+        QPushButton:disabled { color: #444; border-color: #222; }
 
+        QPushButton#toggleBtn {
+            font-size: 11pt; font-weight: 600; padding: 12px 40px;
+            border-radius: 10px;
+        }
         QPushButton#toggleBtn[running="false"] {
-            border-color: #4caf50; color: #4caf50; font-size: 11pt; padding: 10px 32px;
+            background: #4caf50; color: #fff; border: none;
         }
-        QPushButton#toggleBtn[running="false"]:hover { background: #1b3a1b; }
+        QPushButton#toggleBtn[running="false"]:hover { background: #5cbf60; }
         QPushButton#toggleBtn[running="true"] {
-            border-color: #e53935; color: #e53935; font-size: 11pt; padding: 10px 32px;
+            background: transparent; color: #e53935; border: 1px solid #e53935;
         }
-        QPushButton#toggleBtn[running="true"]:hover { background: #3a1a1a; }
+        QPushButton#toggleBtn[running="true"]:hover { background: #2a1515; }
         QPushButton#toggleBtn[running="stopping"] {
-            border-color: #ffa726; color: #ffa726; font-size: 11pt; padding: 10px 32px;
+            background: transparent; color: #ffa726; border: 1px solid #ffa726;
         }
 
-        QPushButton#browserBtn { border-color: #29b6f6; color: #29b6f6; }
-        QPushButton#browserBtn:hover { background: #1a2a3a; }
+        QPushButton#browserBtn {
+            border-color: #29b6f6; color: #29b6f6;
+        }
+        QPushButton#browserBtn:hover { background: #112030; }
+        QPushButton#browserBtn:disabled { border-color: #222; color: #444; }
 
         QPushButton#logToggleBtn {
-            border: none; color: #888; font-size: 9pt; padding: 4px 8px;
+            border: none; color: #555; font-size: 8pt; padding: 4px 0;
             font-weight: 400;
         }
-        QPushButton#logToggleBtn:hover { color: #d4d4d4; }
+        QPushButton#logToggleBtn:hover { color: #999; }
 
         QPlainTextEdit {
-            background: #141414; color: #d4d4d4; border: 1px solid #2a2a2a;
-            border-radius: 6px; font-family: Consolas, monospace; font-size: 9pt;
-            selection-background-color: #264f78; padding: 8px;
+            background: #111; color: #888; border: 1px solid #222;
+            border-radius: 8px; font-family: 'Cascadia Code', Consolas, monospace;
+            font-size: 8pt; selection-background-color: #264f78; padding: 8px;
         }
 
-        QLabel { color: #d4d4d4; }
-        QLabel#statusLabel { font-size: 11pt; font-weight: 600; }
-        QLabel#addrLabel { color: #888; font-size: 9pt; }
-        QLabel#addrLabel a { color: #29b6f6; }
+        QLabel { color: #ccc; }
+
+        QLabel#statusDot {
+            font-size: 9pt; font-weight: 600; padding: 4px 12px;
+            border-radius: 10px;
+        }
+
+        QLabel#addrLabel {
+            color: #555; font-size: 9pt;
+            font-family: 'Cascadia Code', Consolas, monospace;
+        }
+
+        QLabel#extLabel { color: #444; font-size: 8pt; }
+        QLabel#extLabel a { color: #29b6f6; text-decoration: none; }
+
+        QComboBox {
+            background: #1e1e1e; color: #999; border: 1px solid #333;
+            border-radius: 6px; padding: 4px 10px; font-size: 8pt;
+        }
+        QComboBox::drop-down { border: none; }
+        QComboBox QAbstractItemView {
+            background: #1e1e1e; color: #ccc;
+            selection-background-color: #264f78;
+        }
     """))
 
 
@@ -290,100 +317,86 @@ class LauncherWindow(QMainWindow):
         central = QWidget()
         self.setCentralWidget(central)
         layout = QVBoxLayout(central)
-        layout.setContentsMargins(24, 24, 24, 16)
+        layout.setContentsMargins(32, 28, 32, 20)
         layout.setSpacing(0)
 
-        # ── Logo + title ──
-        header = QVBoxLayout()
-        header.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.setSpacing(8)
-
+        # ── Header: logo + title ──
         logo_label = QLabel()
         if ICON_PATH.exists():
             pixmap = QPixmap(str(ICON_PATH)).scaled(
-                96, 96, Qt.AspectRatioMode.KeepAspectRatio,
+                64, 64, Qt.AspectRatioMode.KeepAspectRatio,
                 Qt.TransformationMode.SmoothTransformation)
             logo_label.setPixmap(pixmap)
         logo_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.addWidget(logo_label)
+        layout.addWidget(logo_label)
+
+        layout.addSpacing(8)
 
         title = QLabel("YugiPy")
         title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        title.setStyleSheet("font-size: 18pt; font-weight: 700; color: #fff; margin: 0;")
-        header.addWidget(title)
+        title.setStyleSheet("font-size: 16pt; font-weight: 700; color: #fff;")
+        layout.addWidget(title)
 
-        self._status_label = QLabel("Server stopped")
-        self._status_label.setObjectName("statusLabel")
+        layout.addSpacing(4)
+
+        # ── Status pill ──
+        self._status_label = QLabel("Stopped")
+        self._status_label.setObjectName("statusDot")
         self._status_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        header.addWidget(self._status_label)
+        layout.addWidget(self._status_label, alignment=Qt.AlignmentFlag.AlignCenter)
 
+        layout.addSpacing(4)
+
+        # ── Server address ──
         self._addr_label = QLabel("")
         self._addr_label.setObjectName("addrLabel")
         self._addr_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._addr_label.setTextFormat(Qt.TextFormat.RichText)
-        self._addr_label.setOpenExternalLinks(False)
         self._addr_label.setTextInteractionFlags(
             Qt.TextInteractionFlag.TextSelectableByMouse)
-        header.addWidget(self._addr_label)
+        layout.addWidget(self._addr_label)
 
-        self._ext_label = QLabel("")
-        self._ext_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._ext_label.setTextFormat(Qt.TextFormat.RichText)
-        self._ext_label.setOpenExternalLinks(False)
-        self._ext_label.linkActivated.connect(self._on_ext_link)
-        self._ext_label.setStyleSheet("font-size: 9pt;")
-        header.addWidget(self._ext_label)
+        layout.addSpacing(20)
 
-        layout.addLayout(header)
-        layout.addSpacing(16)
-
-        # ── Protocol selector ──
-        proto_row = QHBoxLayout()
-        proto_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        proto_row.setSpacing(8)
-
-        proto_label = QLabel("Protocol:")
-        proto_label.setStyleSheet("color: #888; font-size: 9pt;")
-        proto_row.addWidget(proto_label)
-
-        self._proto_combo = QComboBox()
-        self._proto_combo.addItem("HTTPS", "https")
-        self._proto_combo.addItem("HTTP", "http")
-        self._proto_combo.setStyleSheet(
-            "QComboBox { background: #2d2d2d; color: #d4d4d4; border: 1px solid #444;"
-            " border-radius: 4px; padding: 4px 8px; font-size: 9pt; }"
-            "QComboBox::drop-down { border: none; }"
-            "QComboBox QAbstractItemView { background: #252526; color: #d4d4d4;"
-            " selection-background-color: #264f78; }")
-        self._proto_combo.currentIndexChanged.connect(self._on_proto_changed)
-        proto_row.addWidget(self._proto_combo)
-
-        layout.addLayout(proto_row)
-
-        self._proto_hint = QLabel("")
-        self._proto_hint.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._proto_hint.setWordWrap(True)
-        self._proto_hint.setStyleSheet("color: #666; font-size: 8pt; padding: 0 24px;")
-        layout.addWidget(self._proto_hint)
-        self._on_proto_changed()
-
-        layout.addSpacing(10)
-
-        # ── Buttons ──
+        # ── Primary action ──
         self._toggle_btn = QPushButton("Start server")
         self._toggle_btn.setObjectName("toggleBtn")
         self._toggle_btn.setProperty("running", "false")
+        self._toggle_btn.setFixedWidth(200)
         self._toggle_btn.clicked.connect(self._toggle_server)
         layout.addWidget(self._toggle_btn, alignment=Qt.AlignmentFlag.AlignCenter)
 
         layout.addSpacing(8)
 
+        # ── Secondary actions row ──
+        actions_row = QHBoxLayout()
+        actions_row.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        actions_row.setSpacing(8)
+
         self._browser_btn = QPushButton("Open in browser")
         self._browser_btn.setObjectName("browserBtn")
         self._browser_btn.clicked.connect(self._open_browser)
-        layout.addWidget(self._browser_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        actions_row.addWidget(self._browser_btn)
+
+        self._proto_combo = QComboBox()
+        self._proto_combo.addItem("HTTPS", "https")
+        self._proto_combo.addItem("HTTP", "http")
+        self._proto_combo.currentIndexChanged.connect(self._on_proto_changed)
+        actions_row.addWidget(self._proto_combo)
+
+        layout.addLayout(actions_row)
 
         layout.addSpacing(12)
+
+        # ── Extension status ──
+        self._ext_label = QLabel("")
+        self._ext_label.setObjectName("extLabel")
+        self._ext_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self._ext_label.setTextFormat(Qt.TextFormat.RichText)
+        self._ext_label.setOpenExternalLinks(False)
+        self._ext_label.linkActivated.connect(self._on_ext_link)
+        layout.addWidget(self._ext_label)
+
+        layout.addStretch()
 
         # ── Log (collapsed by default) ──
         self._log_toggle_btn = QPushButton("Show logs")
@@ -435,15 +448,6 @@ class LauncherWindow(QMainWindow):
 
     @Slot()
     def _on_proto_changed(self):
-        proto = self._proto_combo.currentData()
-        if proto == "https":
-            self._proto_hint.setText(
-                "Camera works on all browsers (including Safari).\n"
-                "The browser will show a security warning on first visit — accept it once.")
-        else:
-            self._proto_hint.setText(
-                "No security warnings. Camera works on Chrome/Firefox (not Safari).\n"
-                "Use this if you only access from the same PC or don't need Safari.")
         self._save_settings()
 
     @property
@@ -490,7 +494,6 @@ class LauncherWindow(QMainWindow):
         if self._use_https:
             args += ["--ssl-keyfile", str(KEY_FILE), "--ssl-certfile", str(CERT_FILE)]
 
-        self._proto_combo.setEnabled(False)
         self._log.clear()
         proto_name = "HTTPS" if self._use_https else "HTTP"
         self._append_log(f"Starting server ({proto_name})...", "#4caf50")
@@ -556,7 +559,6 @@ class LauncherWindow(QMainWindow):
                 )
         self._process = None
         self._toggle_btn.setEnabled(True)
-        self._proto_combo.setEnabled(True)
         self._update_state()
 
     @Slot(QProcess.ProcessError)
@@ -564,7 +566,6 @@ class LauncherWindow(QMainWindow):
         self._append_log(f"Process error: {error}", "#e53935")
         self._process = None
         self._toggle_btn.setEnabled(True)
-        self._proto_combo.setEnabled(True)
         self._update_state()
 
     # ── UI helpers ──
@@ -588,20 +589,23 @@ class LauncherWindow(QMainWindow):
         self._toggle_btn.style().polish(self._toggle_btn)
 
         self._browser_btn.setEnabled(running)
+        self._proto_combo.setEnabled(not running)
 
         if running:
-            self._status_label.setText("Server running")
-            self._status_label.setStyleSheet("color: #4caf50;")
-            url = self._server_url
-            self._addr_label.setText(url)
+            self._status_label.setText("Running")
+            self._status_label.setStyleSheet(
+                "color: #4caf50; background: #1b2e1b; border-radius: 10px;"
+                " padding: 4px 14px; font-size: 9pt; font-weight: 600;")
+            self._addr_label.setText(self._server_url)
             self._tray_toggle.setText("Stop server")
-            self._tray.setToolTip(f"YugiPy – running ({url})")
+            self._tray.setToolTip(f"YugiPy – running ({self._server_url})")
             self._ext_timer.start()
-            # First check after a short delay (server needs time to boot)
             QTimer.singleShot(2000, self._check_extension)
         else:
-            self._status_label.setText("Server stopped")
-            self._status_label.setStyleSheet("color: #e53935;")
+            self._status_label.setText("Stopped")
+            self._status_label.setStyleSheet(
+                "color: #666; background: #1e1e1e; border-radius: 10px;"
+                " padding: 4px 14px; font-size: 9pt; font-weight: 600;")
             self._addr_label.setText("")
             self._ext_label.setText(
                 '<a href="ext://install" style="color:#29b6f6;">Install Firefox extension</a>')
@@ -638,11 +642,11 @@ class LauncherWindow(QMainWindow):
         self._ext_connected = connected
         if connected:
             self._ext_label.setText(
-                '<span style="color:#4caf50;">Firefox extension: connected</span>')
+                '<span style="color:#4caf50;">Extension connected</span>')
         else:
             self._ext_label.setText(
-                '<span style="color:#888;">Firefox extension: not connected</span>'
-                ' &mdash; <a href="ext://install" style="color:#29b6f6;">Install</a>')
+                '<span style="color:#444;">Extension not connected</span>'
+                ' · <a href="ext://install" style="color:#29b6f6;">Install</a>')
 
     @Slot(str)
     def _on_ext_link(self, url):

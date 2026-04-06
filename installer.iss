@@ -40,8 +40,9 @@ Name: "startmenu"; Description: "Create a Start Menu shortcut"; GroupDescription
 [Files]
 ; PyInstaller output directory
 Source: "dist\YugiPy\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
-; Pre-built card hash index — placed in APPDATA so the setup wizard can be skipped
-Source: "data\card_hashes.db"; DestDir: "{userappdata}\AmMstools\YugiPy\data"; Flags: onlyifdoesntexist
+; Pre-built card hash index + CLIP model — placed in APPDATA so the app works out of the box
+Source: "dist\YugiPy\_internal\data\card_hashes.db"; DestDir: "{userappdata}\AmMstools\YugiPy\data"; Flags: onlyifdoesntexist
+Source: "dist\YugiPy\_internal\data\clip_visual.onnx"; DestDir: "{userappdata}\AmMstools\YugiPy\data"; Flags: onlyifdoesntexist
 
 [Icons]
 Name: "{group}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"; Tasks: startmenu
