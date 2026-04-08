@@ -336,6 +336,7 @@ export async function openCardModal(id, cards) {
             const resp = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${card.card_id}`);
             if (resp.ok) {
                 const apiSets = (await resp.json()).data?.[0]?.card_sets || [];
+                apiSets.sort((a, b) => (a.set_code || "").localeCompare(b.set_code || ""));
                 setSelect.innerHTML = "";
                 if (card.set_code && !apiSets.some((s) => s.set_code === card.set_code)) {
                     const opt = document.createElement("option");
@@ -347,7 +348,8 @@ export async function openCardModal(id, cards) {
                 apiSets.forEach((s) => {
                     const opt = document.createElement("option");
                     opt.value = s.set_code;
-                    opt.textContent = `${s.set_code} (${s.set_rarity})`;
+                    opt.textContent = `${s.set_code} \u2014 ${s.set_rarity}`;
+                    opt.style.color = "#ffb74d";
                     if (s.set_code === card.set_code) opt.selected = true;
                     setSelect.appendChild(opt);
                 });
@@ -629,6 +631,7 @@ document.getElementById("modal-split").addEventListener("click", () => {
             const resp = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${card.card_id}`);
             if (resp.ok) {
                 const apiSets = (await resp.json()).data?.[0]?.card_sets || [];
+                apiSets.sort((a, b) => (a.set_code || "").localeCompare(b.set_code || ""));
                 setSelect.innerHTML = "";
                 if (card.set_code && !apiSets.some((s) => s.set_code === card.set_code)) {
                     const opt = document.createElement("option");
@@ -640,7 +643,8 @@ document.getElementById("modal-split").addEventListener("click", () => {
                 apiSets.forEach((s) => {
                     const opt = document.createElement("option");
                     opt.value = s.set_code;
-                    opt.textContent = `${s.set_code} (${s.set_rarity})`;
+                    opt.textContent = `${s.set_code} \u2014 ${s.set_rarity}`;
+                    opt.style.color = "#ffb74d";
                     if (s.set_code === card.set_code) opt.selected = true;
                     setSelect.appendChild(opt);
                 });
@@ -756,11 +760,13 @@ export function openAddModal(cardData, sets) {
     const select = document.getElementById("add-set-select");
     select.innerHTML = "";
     if (sets && sets.length > 0) {
-        sets.forEach((s) => {
+        const sortedSets = [...sets].sort((a, b) => (a.set_code || "").localeCompare(b.set_code || ""));
+        sortedSets.forEach((s) => {
             const opt = document.createElement("option");
             opt.value = JSON.stringify({ set_code: s.set_code, set_rarity: s.set_rarity, set_name: s.set_name, set_price: s.set_price || null });
             const priceStr = s.set_price ? ` \u2014 ${s.set_price}\u20AC` : "";
             opt.textContent = `${s.set_code} \u2014 ${s.set_name} (${s.set_rarity})${priceStr}`;
+            opt.style.color = "#ffb74d";
             select.appendChild(opt);
         });
     } else {
