@@ -6,7 +6,7 @@ import {
     API, allCollectionCards, setAllCollectionCards,
     currentModalCardId, setCurrentModalCardId,
     currentModalCard, setCurrentModalCard,
-    pendingModalSaves,
+    pendingModalSaves, autoFetchPrices,
     RARITY_OPTIONS, TYPE_GROUP, TYPE_ORDER,
     langFlag, cardImgUrl, getDisplayPrice, showToast,
     buildCardmarketUrl, detectLangFromSetCode,
@@ -480,11 +480,13 @@ export async function openCardModal(id, cards) {
     document.getElementById("modal-quantity").textContent = `x${card.quantity}`;
     document.getElementById("modal-split").style.display = card.quantity > 1 ? "" : "none";
 
-    // Auto-fetch price if older than 7 days
-    const PRICE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
-    const priceAge = card.price_updated_at ? Date.now() - new Date(card.price_updated_at).getTime() : Infinity;
-    if (priceAge > PRICE_MAX_AGE_MS && !card.price_manual) {
-        document.getElementById("modal-cm-price").click();
+    // Auto-fetch price if older than 7 days (can be disabled in settings)
+    if (autoFetchPrices) {
+        const PRICE_MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
+        const priceAge = card.price_updated_at ? Date.now() - new Date(card.price_updated_at).getTime() : Infinity;
+        if (priceAge > PRICE_MAX_AGE_MS && !card.price_manual) {
+            document.getElementById("modal-cm-price").click();
+        }
     }
 }
 

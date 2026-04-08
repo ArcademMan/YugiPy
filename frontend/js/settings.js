@@ -2,7 +2,7 @@
 // Settings view — setup wizard, price display, bulk sync, extension status
 // =============================================
 
-import { API, priceDisplayMode, setPriceDisplayMode, saveSetting, showToast } from "./shared.js";
+import { API, priceDisplayMode, setPriceDisplayMode, autoFetchPrices, setAutoFetchPrices, saveSetting, showToast } from "./shared.js";
 import { loadCollection, renderCollection } from "./collection.js";
 
 // --- Price Display Setting ---
@@ -12,6 +12,14 @@ priceSelect.addEventListener("change", () => {
     setPriceDisplayMode(priceSelect.value);
     saveSetting("priceDisplay", priceSelect.value);
     renderCollection(window._lastCards || []);
+});
+
+// --- Auto-fetch Prices Setting ---
+const autoFetchCheckbox = document.getElementById("setting-auto-fetch-prices");
+autoFetchCheckbox.checked = autoFetchPrices;
+autoFetchCheckbox.addEventListener("change", () => {
+    setAutoFetchPrices(autoFetchCheckbox.checked);
+    saveSetting("autoFetchPrices", autoFetchCheckbox.checked);
 });
 
 // --- Setup Wizard ---

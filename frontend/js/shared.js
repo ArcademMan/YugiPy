@@ -19,6 +19,7 @@ export let pendingModalSaves = [];
 // --- Settings ---
 export let _settings = {};
 export let priceDisplayMode = "cm_median";
+export let autoFetchPrices = true;
 
 export async function loadSettings() {
     try {
@@ -26,9 +27,11 @@ export async function loadSettings() {
         if (resp.ok) _settings = await resp.json();
     } catch (e) { /* use defaults */ }
     priceDisplayMode = _settings.priceDisplay || "cm_median";
+    autoFetchPrices = _settings.autoFetchPrices !== false;
 }
 
 export function setPriceDisplayMode(mode) { priceDisplayMode = mode; }
+export function setAutoFetchPrices(val) { autoFetchPrices = val; }
 
 export async function saveSetting(key, value) {
     _settings[key] = value;
