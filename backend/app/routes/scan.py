@@ -310,6 +310,6 @@ async def search_card(q: str):
             if resp.status_code == 200:
                 data = resp.json().get("data", [])
                 if data:
-                    return [_parse_candidate(card) for card in data[:20]]
+                    return [_parse_candidate(card) for card in data]
 
     return []
