@@ -20,8 +20,10 @@ from fastapi.staticfiles import StaticFiles
 from .database import Base, engine
 from .routes import cards, cardmarket, scan, settings, setup, stats
 
-# Create tables if they don't exist (first-time setup)
+# Auto-migrate existing DBs, then create_all for brand-new ones.
 from . import models  # noqa: ensure models are registered
+from .migrate import run_migrations
+run_migrations(engine)
 Base.metadata.create_all(bind=engine)
 
 

@@ -556,49 +556,24 @@
                 <button class="modal-close">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
                 </button>
-                <h3>Split card</h3>
-                <p class="text-muted" id="split-info"></p>
-
-                <div class="form-group">
-                    <label for="split-qty">How many copies to split</label>
-                    <input type="number" id="split-qty" min="1" value="1" class="form-input">
+                <div class="modal-body">
+                    <div class="modal-img-wrapper">
+                        <button id="split-img-prev" class="modal-img-arrow modal-img-arrow-left" hidden>&lsaquo;</button>
+                        <img id="split-img" src="" alt="">
+                        <button id="split-img-next" class="modal-img-arrow modal-img-arrow-right" hidden>&rsaquo;</button>
+                        <span id="split-img-counter" class="modal-img-counter" hidden></span>
+                    </div>
+                    <div id="split-details"></div>
                 </div>
-                <div class="form-group">
-                    <label for="split-rarity">New rarity</label>
-                    <select id="split-rarity"></select>
+                <div id="split-collection-info"></div>
+                <div class="modal-actions split-actions">
+                    <div class="form-group split-qty-group">
+                        <label for="split-qty">Copies to split</label>
+                        <input type="number" id="split-qty" min="1" value="1" class="form-input">
+                    </div>
+                    <button id="split-confirm" class="btn-primary btn-sm">Confirm Split</button>
+                    <button id="split-cancel" class="btn-secondary btn-sm">Cancel</button>
                 </div>
-                <div class="form-group">
-                    <label for="split-condition">New condition</label>
-                    <select id="split-condition">
-                        <option value="Mint">Mint</option>
-                        <option value="Near Mint">Near Mint</option>
-                        <option value="Excellent">Excellent</option>
-                        <option value="Good">Good</option>
-                        <option value="Light Played">Light Played</option>
-                        <option value="Played">Played</option>
-                        <option value="Poor">Poor</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label for="split-lang">New language</label>
-                    <select id="split-lang">
-                        <option value="IT">Italian</option>
-                        <option value="EN">English</option>
-                        <option value="FR">Fran&ccedil;ais</option>
-                        <option value="DE">Deutsch</option>
-                        <option value="ES">Espa&ntilde;ol</option>
-                        <option value="PT">Portugu&ecirc;s</option>
-                        <option value="JA">日本語</option>
-                        <option value="KO">한국어</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="split-set-code">Set code</label>
-                    <input type="text" id="split-set-code" class="form-input" placeholder="e.g. BLMR-IT065">
-                </div>
-
-                <button id="split-confirm" class="btn-primary btn-full">Split</button>
             </div>
         </div>
 

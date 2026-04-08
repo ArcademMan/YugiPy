@@ -24,8 +24,6 @@ router = APIRouter(prefix="/api/setup", tags=["setup"])
 
 ensure_dirs()
 
-ensure_dirs()
-
 YGOPRODECK_API = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
 REQUESTS_PER_SECOND = 12
 HASH_SIZE = 8

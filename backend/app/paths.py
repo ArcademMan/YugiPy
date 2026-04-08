@@ -1,13 +1,22 @@
 """Centralized data paths for YugiPy.
 
-All mutable data (databases, downloaded images) lives under APPDATA so the
-application can be installed in Program Files without permission issues.
+All mutable data (databases, downloaded images) lives under a platform-specific
+user data directory so the application can be installed system-wide without
+permission issues.
 """
 
 import os
+import sys
 from pathlib import Path
 
-DATA_DIR = Path(os.environ.get("APPDATA", Path.home())) / "AmMstools" / "YugiPy" / "data"
+if sys.platform == "darwin":
+    _BASE = Path.home() / "Library" / "Application Support" / "AmMstools" / "YugiPy"
+elif sys.platform == "win32":
+    _BASE = Path(os.environ.get("APPDATA", Path.home())) / "AmMstools" / "YugiPy"
+else:
+    _BASE = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "AmMstools" / "YugiPy"
+
+DATA_DIR = _BASE / "data"
 
 # Databases
 COLLECTION_DB = DATA_DIR / "yugipy.db"

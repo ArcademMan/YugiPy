@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict
 class CardBase(BaseModel):
     card_id: int
     name: str
-    set_code: str | None = None
+    set_code: str = ""
     type: str
     frame_type: str
     description: str
@@ -51,6 +51,7 @@ class CardSplit(BaseModel):
     lang: str | None = None
     location: list[str] | None = None
     set_code: str | None = None
+    image_url: str | None = None
 
 
 class CardResponse(CardBase):

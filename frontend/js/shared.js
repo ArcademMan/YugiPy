@@ -132,7 +132,6 @@ export const RARITY_ORDER = {
 // --- Cardmarket mappings ---
 export let CM_EXPANSIONS = {};
 export let CM_RARITIES = {};
-const CM_LANGS = { EN: 1, FR: 2, DE: 3, ES: 4, IT: 5, PT: 6, JA: 7, KO: 8 };
 
 Promise.all([
     fetch("js/cardmarket_expansions.json").then(r => r.json()),

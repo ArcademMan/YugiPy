@@ -9,7 +9,7 @@ from .database import Base
 class Card(Base):
     __tablename__ = "cards"
     __table_args__ = (
-        UniqueConstraint("card_id", "rarity", "condition", "lang", name="uq_card_variant"),
+        UniqueConstraint("card_id", "rarity", "condition", "lang", "set_code", "image_url", name="uq_card_variant"),
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -17,7 +17,7 @@ class Card(Base):
     # Card identity
     card_id: Mapped[int] = mapped_column(Integer, index=True)
     name: Mapped[str] = mapped_column(String(255))
-    set_code: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    set_code: Mapped[str] = mapped_column(String(20), nullable=False, default="", server_default="")
 
     # Collection-specific
     quantity: Mapped[int] = mapped_column(Integer, default=1)
@@ -36,7 +36,7 @@ class Card(Base):
     race: Mapped[str | None] = mapped_column(String(50), nullable=True)
     attribute: Mapped[str | None] = mapped_column(String(20), nullable=True)
     archetype: Mapped[str | None] = mapped_column(String(100), nullable=True)
-    image_url: Mapped[str | None] = mapped_column(Text, nullable=True)
+    image_url: Mapped[str] = mapped_column(Text, nullable=False, default="", server_default="")
     price_cardmarket: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_tcgplayer: Mapped[float | None] = mapped_column(Float, nullable=True)
     price_manual: Mapped[bool] = mapped_column(Integer, default=False, server_default="0")

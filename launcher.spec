@@ -1,10 +1,19 @@
 # -*- mode: python ; coding: utf-8 -*-
 
 import os
+import sys
 import subprocess
 from pathlib import Path
 
 ROOT = os.path.abspath('.')
+
+# Platform-aware data directory (must match backend/app/paths.py logic)
+if sys.platform == 'darwin':
+    _data_dir = os.path.join(os.path.expanduser('~'), 'Library', 'Application Support', 'AmMstools', 'YugiPy', 'data')
+elif sys.platform == 'win32':
+    _data_dir = os.path.join(os.environ.get('APPDATA', ''), 'AmMstools', 'YugiPy', 'data')
+else:
+    _data_dir = os.path.join(os.environ.get('XDG_DATA_HOME', os.path.expanduser('~/.local/share')), 'AmMstools', 'YugiPy', 'data')
 
 a = Analysis(
     ['launcher.py'],
@@ -25,8 +34,8 @@ a = Analysis(
         # Extension source for users
         ('extension', 'extension'),
         # CLIP ONNX model + prebuilt card embeddings
-        (os.path.join(os.environ.get('APPDATA', ''), 'AmMstools', 'YugiPy', 'data', 'clip_visual.onnx'), 'data'),
-        (os.path.join(os.environ.get('APPDATA', ''), 'AmMstools', 'YugiPy', 'data', 'card_hashes.db'), 'data'),
+        (os.path.join(_data_dir, 'clip_visual.onnx'), 'data'),
+        (os.path.join(_data_dir, 'card_hashes.db'), 'data'),
     ],
     hiddenimports=[
         # -- FastAPI / Uvicorn stack --
@@ -65,10 +74,6 @@ a = Analysis(
         'PIL',
         'PIL.Image',
         'numpy',
-        'imagehash',
-        'pybktree',
-        # -- OCR --
-        'pytesseract',
         # -- ONNX Runtime (CLIP inference) --
         'onnxruntime',
         # -- SSL certs --

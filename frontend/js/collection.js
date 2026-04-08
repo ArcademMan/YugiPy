@@ -222,15 +222,15 @@ function _updateModalImgUI() {
 function _switchModalImage(delta) {
     if (modalImages.length <= 1) return;
     modalImageIndex = (modalImageIndex + delta + modalImages.length) % modalImages.length;
-    const newUrl = modalImages[modalImageIndex];
-    document.getElementById("modal-img").src = newUrl;
+    const img = modalImages[modalImageIndex];
+    document.getElementById("modal-img").src = img.display;
     _updateModalImgUI();
     if (currentModalCard) {
-        currentModalCard.image_url = newUrl;
+        currentModalCard.image_url = img.raw;
         fetch(`${API}/api/cards/${currentModalCardId}`, {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ image_url: newUrl }),
+            body: JSON.stringify({ image_url: img.raw }),
         });
     }
 }
@@ -249,15 +249,15 @@ export async function openCardModal(id, cards) {
     imgEl.src = cardImgUrl(card.image_url);
     modal.hidden = false;
 
-    modalImages = [cardImgUrl(card.image_url)];
+    modalImages = [{ display: cardImgUrl(card.image_url), raw: card.image_url }];
     modalImageIndex = 0;
     _updateModalImgUI();
 
     _fetchCardImages(card.name).then((images) => {
         if (currentModalCardId !== id) return;
         if (images.length > 1) {
-            modalImages = images.map((i) => cardImgUrl(i.image_url));
-            const idx = modalImages.indexOf(cardImgUrl(card.image_url));
+            modalImages = images.map((i) => ({ display: cardImgUrl(i.image_url), raw: i.image_url }));
+            const idx = modalImages.findIndex((i) => i.raw === card.image_url);
             modalImageIndex = idx >= 0 ? idx : 0;
             _updateModalImgUI();
         }
@@ -530,35 +530,175 @@ document.getElementById("modal-delete").addEventListener("click", async () => {
     } catch (e) { console.error(e); }
 });
 
-// --- Split ---
+// --- Split modal (separate modal, same component structure) ---
+let splitImages = [];
+let splitImageIndex = 0;
+
+function _updateSplitImgUI() {
+    const prev = document.getElementById("split-img-prev");
+    const next = document.getElementById("split-img-next");
+    const counter = document.getElementById("split-img-counter");
+    const multi = splitImages.length > 1;
+    prev.hidden = !multi;
+    next.hidden = !multi;
+    counter.hidden = !multi;
+    if (multi) counter.textContent = `${splitImageIndex + 1} / ${splitImages.length}`;
+}
+
+function _switchSplitImage(delta) {
+    if (splitImages.length <= 1) return;
+    splitImageIndex = (splitImageIndex + delta + splitImages.length) % splitImages.length;
+    document.getElementById("split-img").src = splitImages[splitImageIndex].display;
+    _updateSplitImgUI();
+}
+
+document.getElementById("split-img-prev").addEventListener("click", () => _switchSplitImage(-1));
+document.getElementById("split-img-next").addEventListener("click", () => _switchSplitImage(1));
+
 document.getElementById("modal-split").addEventListener("click", () => {
     if (!currentModalCard) return;
     const card = currentModalCard;
-    document.getElementById("split-info").innerHTML =
-        `${card.name} \u2014 currently x${card.quantity} (${card.rarity}, ${card.condition}) ${langFlag(card.lang)}`;
+
+    // Image
+    document.getElementById("split-img").src = cardImgUrl(card.image_url);
+    splitImages = [{ display: cardImgUrl(card.image_url), raw: card.image_url }];
+    splitImageIndex = 0;
+    _updateSplitImgUI();
+    _fetchCardImages(card.name).then((images) => {
+        if (images.length > 1) {
+            splitImages = images.map((i) => ({ display: cardImgUrl(i.image_url), raw: i.image_url }));
+            const idx = splitImages.findIndex((i) => i.raw === card.image_url);
+            splitImageIndex = idx >= 0 ? idx : 0;
+            document.getElementById("split-img").src = splitImages[splitImageIndex].display;
+            _updateSplitImgUI();
+        }
+    });
+
+    // Card details (read-only)
+    document.getElementById("split-details").innerHTML = `
+        <p><strong>${card.name}</strong></p>
+        <p>${card.type} ${card.race ? "/ " + card.race : ""}</p>
+        ${card.atk != null ? `<p>ATK: ${card.atk} / DEF: ${card.def_ ?? "?"}</p>` : ""}
+        <p class="text-muted">Splitting from x${card.quantity}</p>
+    `;
+
+    // Editable fields (same structure as card modal)
+    const condOpts = ["Mint","Near Mint","Excellent","Good","Light Played","Played","Poor"];
+    const langOpts = [["IT","Italian"],["EN","English"],["FR","French"],["DE","German"],["ES","Spanish"],["PT","Portuguese"],["JA","Japanese"],["KO","Korean"]];
+
+    document.getElementById("split-collection-info").innerHTML = `
+        <div class="form-row">
+            <div class="form-group" style="flex:2">
+                <label>Rarity</label>
+                <select id="split-edit-rarity">
+                    ${RARITY_OPTIONS.map((r) => `<option value="${r}" ${r === card.rarity ? "selected" : ""}>${r}</option>`).join("")}
+                    ${!RARITY_OPTIONS.includes(card.rarity) ? `<option value="${card.rarity}" selected>${card.rarity}</option>` : ""}
+                </select>
+            </div>
+            <div class="form-group" style="flex:1">
+                <label>Set Code</label>
+                <select id="split-select-set-code">
+                    <option value="">Loading...</option>
+                </select>
+                <input type="text" id="split-edit-set-code" value="${card.set_code || ""}" placeholder="e.g. BLMR-IT065" hidden>
+            </div>
+        </div>
+        <div class="form-row">
+            <div class="form-group">
+                <label>Condition</label>
+                <select id="split-edit-condition">
+                    ${condOpts.map((c) => `<option value="${c}" ${c === card.condition ? "selected" : ""}>${c}</option>`).join("")}
+                </select>
+            </div>
+            <div class="form-group">
+                <label>Language ${langFlag(card.lang)}</label>
+                <select id="split-edit-lang">
+                    ${langOpts.map(([v, l]) => `<option value="${v}" ${v === card.lang ? "selected" : ""}>${l}</option>`).join("")}
+                </select>
+            </div>
+        </div>
+    `;
+
+    // Populate set code dropdown
+    const setSelect = document.getElementById("split-select-set-code");
+    const setInput = document.getElementById("split-edit-set-code");
+    (async () => {
+        try {
+            const resp = await fetch(`https://db.ygoprodeck.com/api/v7/cardinfo.php?id=${card.card_id}`);
+            if (resp.ok) {
+                const apiSets = (await resp.json()).data?.[0]?.card_sets || [];
+                setSelect.innerHTML = "";
+                if (card.set_code && !apiSets.some((s) => s.set_code === card.set_code)) {
+                    const opt = document.createElement("option");
+                    opt.value = card.set_code;
+                    opt.textContent = card.set_code + " (current)";
+                    opt.selected = true;
+                    setSelect.appendChild(opt);
+                }
+                apiSets.forEach((s) => {
+                    const opt = document.createElement("option");
+                    opt.value = s.set_code;
+                    opt.textContent = `${s.set_code} (${s.set_rarity})`;
+                    if (s.set_code === card.set_code) opt.selected = true;
+                    setSelect.appendChild(opt);
+                });
+                const otherOpt = document.createElement("option");
+                otherOpt.value = "__other__";
+                otherOpt.textContent = "Other...";
+                setSelect.appendChild(otherOpt);
+                if (!card.set_code) {
+                    const emptyOpt = document.createElement("option");
+                    emptyOpt.value = "";
+                    emptyOpt.textContent = "\u2014 Select \u2014";
+                    emptyOpt.selected = true;
+                    setSelect.prepend(emptyOpt);
+                }
+            } else {
+                setSelect.hidden = true;
+                setInput.hidden = false;
+            }
+        } catch (e) {
+            setSelect.hidden = true;
+            setInput.hidden = false;
+        }
+    })();
+
+    setSelect.addEventListener("change", () => {
+        if (setSelect.value === "__other__") {
+            setSelect.hidden = true;
+            setInput.hidden = false;
+            setInput.value = "";
+            setInput.focus();
+        }
+    });
+
+    // Quantity
     document.getElementById("split-qty").value = 1;
     document.getElementById("split-qty").max = card.quantity - 1;
-    const splitRarity = document.getElementById("split-rarity");
-    splitRarity.innerHTML = document.getElementById("add-rarity").innerHTML;
-    splitRarity.value = card.rarity;
-    document.getElementById("split-condition").value = card.condition;
-    document.getElementById("split-lang").value = card.lang;
-    document.getElementById("split-set-code").value = card.set_code || "";
+
     document.getElementById("split-modal").hidden = false;
+});
+
+document.getElementById("split-cancel").addEventListener("click", () => {
+    document.getElementById("split-modal").hidden = true;
 });
 
 document.getElementById("split-confirm").addEventListener("click", async () => {
     if (!currentModalCardId) return;
     const qty = parseInt(document.getElementById("split-qty").value) || 1;
-    const rarity = document.getElementById("split-rarity").value;
-    const condition = document.getElementById("split-condition").value;
-    const lang = document.getElementById("split-lang").value;
-    const setCode = document.getElementById("split-set-code").value.trim() || null;
+    const rarity = document.getElementById("split-edit-rarity").value;
+    const condition = document.getElementById("split-edit-condition").value;
+    const lang = document.getElementById("split-edit-lang").value;
+    const setSelect = document.getElementById("split-select-set-code");
+    const setInput = document.getElementById("split-edit-set-code");
+    const setCode = (setSelect && !setSelect.hidden ? setSelect.value : setInput?.value?.trim()) || null;
+    const imageUrl = splitImages.length ? splitImages[splitImageIndex].raw : null;
+
     try {
         const resp = await fetch(`${API}/api/cards/${currentModalCardId}/split`, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ quantity: qty, rarity, condition, lang, set_code: setCode }),
+            body: JSON.stringify({ quantity: qty, rarity, condition, lang, set_code: setCode, image_url: imageUrl }),
         });
         if (resp.ok) {
             showToast("Card split!");

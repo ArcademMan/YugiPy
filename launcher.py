@@ -39,7 +39,12 @@ LOG = logging.getLogger("launcher")
 
 # ── Settings persistence ──────────────────────────────────────
 
-SETTINGS_DIR = Path(os.environ.get("APPDATA", Path.home())) / "AmMstools" / "YugiPy"
+if sys.platform == "darwin":
+    SETTINGS_DIR = Path.home() / "Library" / "Application Support" / "AmMstools" / "YugiPy"
+elif sys.platform == "win32":
+    SETTINGS_DIR = Path(os.environ.get("APPDATA", Path.home())) / "AmMstools" / "YugiPy"
+else:
+    SETTINGS_DIR = Path(os.environ.get("XDG_DATA_HOME", Path.home() / ".local" / "share")) / "AmMstools" / "YugiPy"
 SETTINGS_FILE = SETTINGS_DIR / "settings.json"
 
 _DEFAULTS = {
@@ -66,9 +71,9 @@ def save_settings(settings: dict):
 
 
 def _deploy_bundled_data():
-    """Copy bundled data files (ONNX model, hash DB) to APPDATA on first run."""
+    """Copy bundled data files (ONNX model, hash DB) to user data dir on first run."""
     if not getattr(sys, 'frozen', False):
-        return  # dev mode — files already in APPDATA
+        return  # dev mode — files already in user data dir
     bundled_data = BUNDLE_DIR / "data"
     if not bundled_data.exists():
         return
@@ -81,6 +86,49 @@ def _deploy_bundled_data():
         if src.exists() and not dst.exists():
             LOG.info("Deploying bundled %s to %s", filename, dst)
             shutil.copy2(str(src), str(dst))
+
+
+def _has_browser(name: str) -> bool:
+    """Check if a browser is installed. name: 'firefox' or 'chrome'."""
+    import shutil
+    if name == "firefox":
+        if shutil.which("firefox"):
+            return True
+        if sys.platform == "darwin":
+            return Path("/Applications/Firefox.app").exists()
+        if sys.platform == "win32":
+            return any(
+                Path(p).exists() for p in [
+                    os.path.expandvars(r"%ProgramFiles%\Mozilla Firefox\firefox.exe"),
+                    os.path.expandvars(r"%ProgramFiles(x86)%\Mozilla Firefox\firefox.exe"),
+                ]
+            )
+    elif name == "chrome":
+        if shutil.which("google-chrome") or shutil.which("google-chrome-stable"):
+            return True
+        if sys.platform == "darwin":
+            return Path("/Applications/Google Chrome.app").exists()
+        if sys.platform == "win32":
+            return any(
+                Path(p).exists() for p in [
+                    os.path.expandvars(r"%ProgramFiles%\Google\Chrome\Application\chrome.exe"),
+                    os.path.expandvars(r"%ProgramFiles(x86)%\Google\Chrome\Application\chrome.exe"),
+                    os.path.expandvars(r"%LocalAppData%\Google\Chrome\Application\chrome.exe"),
+                ]
+            )
+    return False
+
+
+def _ext_install_links() -> str:
+    """Build HTML install links based on which browsers are available."""
+    links = []
+    if _has_browser("firefox"):
+        links.append('<a href="ext://firefox" style="color:#29b6f6;">Firefox</a>')
+    if _has_browser("chrome"):
+        links.append('<a href="ext://chrome" style="color:#29b6f6;">Chrome</a>')
+    if not links:
+        links.append('<a href="ext://install" style="color:#29b6f6;">Install</a>')
+    return "Install extension: " + " · ".join(links) if links else ""
 
 
 def _get_local_ip() -> str:
@@ -607,8 +655,7 @@ class LauncherWindow(QMainWindow):
                 "color: #666; background: #1e1e1e; border-radius: 10px;"
                 " padding: 4px 14px; font-size: 9pt; font-weight: 600;")
             self._addr_label.setText("")
-            self._ext_label.setText(
-                '<a href="ext://install" style="color:#29b6f6;">Install Firefox extension</a>')
+            self._ext_label.setText(_ext_install_links())
             self._ext_connected = False
             self._tray_toggle.setText("Start server")
             self._tray.setToolTip("YugiPy – stopped")
@@ -646,18 +693,40 @@ class LauncherWindow(QMainWindow):
         else:
             self._ext_label.setText(
                 '<span style="color:#444;">Extension not connected</span>'
-                ' · <a href="ext://install" style="color:#29b6f6;">Install</a>')
+                ' · ' + _ext_install_links())
 
     @Slot(str)
     def _on_ext_link(self, url):
-        """Open the .xpi in Firefox to install the extension."""
+        """Install the browser extension (Firefox .xpi or Chrome unpacked)."""
         import webbrowser
-        if EXTENSION_XPI.exists():
-            webbrowser.open(EXTENSION_XPI.as_uri())
+        if url == "ext://firefox":
+            if EXTENSION_XPI.exists():
+                webbrowser.open(EXTENSION_XPI.as_uri())
+        elif url == "ext://chrome":
+            # Chrome doesn't allow direct .crx install — open extensions page
+            # and the extension folder so the user can "Load unpacked"
+            webbrowser.open("chrome://extensions/")
+            self._open_folder(EXTENSION_DIR)
         else:
-            # Fallback: open the extension folder
-            import subprocess
-            subprocess.Popen(["explorer", str(EXTENSION_DIR)])
+            # Legacy / single "install" link — detect best option
+            if _has_browser("firefox"):
+                if EXTENSION_XPI.exists():
+                    webbrowser.open(EXTENSION_XPI.as_uri())
+            elif _has_browser("chrome"):
+                webbrowser.open("chrome://extensions/")
+                self._open_folder(EXTENSION_DIR)
+            else:
+                self._open_folder(EXTENSION_DIR)
+
+    @staticmethod
+    def _open_folder(path: Path):
+        import subprocess
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", str(path)])
+        elif sys.platform == "win32":
+            subprocess.Popen(["explorer", str(path)])
+        else:
+            subprocess.Popen(["xdg-open", str(path)])
 
     @Slot()
     def _open_browser(self):
@@ -712,17 +781,35 @@ class LauncherWindow(QMainWindow):
 # ── Entry point ───────────────────────────────────────────────
 
 def _acquire_single_instance():
-    """Ensure only one instance of the launcher is running (Windows named mutex)."""
-    import ctypes
-    kernel32 = ctypes.windll.kernel32
-    mutex_name = "Global\\AmMstools_YugiPy_Launcher"
-    handle = kernel32.CreateMutexW(None, False, mutex_name)
-    last_error = ctypes.windll.kernel32.GetLastError()
-    # ERROR_ALREADY_EXISTS = 183
-    if last_error == 183:
-        kernel32.CloseHandle(handle)
-        return None
-    return handle
+    """Ensure only one instance of the launcher is running.
+
+    Windows: named mutex via kernel32.
+    macOS/Linux: file lock via fcntl.flock (held for process lifetime).
+    Returns a handle/fd to keep alive, or None if another instance exists.
+    """
+    if sys.platform == "win32":
+        import ctypes
+        kernel32 = ctypes.windll.kernel32
+        mutex_name = "Global\\AmMstools_YugiPy_Launcher"
+        handle = kernel32.CreateMutexW(None, False, mutex_name)
+        last_error = kernel32.GetLastError()
+        if last_error == 183:  # ERROR_ALREADY_EXISTS
+            kernel32.CloseHandle(handle)
+            return None
+        return handle
+    else:
+        import fcntl
+        lock_path = SETTINGS_DIR / ".launcher.lock"
+        SETTINGS_DIR.mkdir(parents=True, exist_ok=True)
+        fd = open(lock_path, "w")
+        try:
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            fd.write(str(os.getpid()))
+            fd.flush()
+            return fd  # keep fd open — lock released when process exits
+        except OSError:
+            fd.close()
+            return None
 
 
 def _run_server():

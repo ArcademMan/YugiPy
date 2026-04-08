@@ -1363,9 +1363,19 @@ main {
     display: flex;
     align-items: center;
     justify-content: space-between;
+    gap: 12px;
     margin-top: 20px;
     padding-top: 16px;
     border-top: 1px solid var(--border);
+}
+
+.split-actions {
+    flex-wrap: wrap;
+}
+
+.split-qty-group {
+    flex: 1 1 100%;
+    margin-bottom: 8px;
 }
 
 .qty-control {

@@ -1,3 +1,5 @@
+import re
+
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse, RedirectResponse
@@ -13,6 +15,18 @@ from ..schemas import CardCreate, CardResponse, CardSplit, CardUpdate
 router = APIRouter(prefix="/api/cards", tags=["cards"])
 
 YGOPRODECK_API = "https://db.ygoprodeck.com/api/v7/cardinfo.php"
+
+_PROXY_RE = re.compile(r".*/api/cards/img/(\d+)$")
+
+
+def _normalize_image_url(url: str | None) -> str:
+    """Convert proxied URLs like /api/cards/img/12345 to the canonical form."""
+    if not url:
+        return ""
+    m = _PROXY_RE.match(url)
+    if m:
+        return f"https://images.ygoprodeck.com/images/cards/{m.group(1)}.jpg"
+    return url
 
 
 @router.get("/img/{card_image_id}")
@@ -109,7 +123,7 @@ def _safe_float(val) -> float | None:
 def add_card(payload: CardCreate, db: Session = Depends(get_db)):
     """Add a card to the collection.
 
-    Matches on (card_id, rarity, condition, lang).
+    Matches on (card_id, rarity, condition, lang, set_code, image_url).
     If a match exists, increments quantity.
     """
     existing = db.scalars(
@@ -118,18 +132,21 @@ def add_card(payload: CardCreate, db: Session = Depends(get_db)):
             Card.rarity == payload.rarity,
             Card.condition == payload.condition,
             Card.lang == payload.lang,
+            Card.set_code == (payload.set_code or ""),
+            Card.image_url == _normalize_image_url(payload.image_url),
         )
     ).first()
 
     if existing:
         existing.quantity += payload.quantity
-        if payload.set_code and not existing.set_code:
-            existing.set_code = payload.set_code
         db.commit()
         db.refresh(existing)
         return existing
 
-    card = Card(**payload.model_dump())
+    data = payload.model_dump()
+    data["set_code"] = data.get("set_code") or ""
+    data["image_url"] = _normalize_image_url(data.get("image_url"))
+    card = Card(**data)
     db.add(card)
     db.commit()
     db.refresh(card)
@@ -145,13 +162,15 @@ def update_card(card_db_id: int, payload: CardUpdate, db: Session = Depends(get_
 
     updates = payload.model_dump(exclude_unset=True)
 
-    # Check if changing a variant key (rarity, condition, lang) would collide
-    # with an existing variant — if so, merge quantities automatically.
-    variant_keys = {"rarity", "condition", "lang"}
+    # Check if changing a variant key would collide with an existing
+    # variant — if so, merge quantities automatically.
+    variant_keys = {"rarity", "condition", "lang", "set_code", "image_url"}
     if updates.keys() & variant_keys:
         new_rarity = updates.get("rarity", card.rarity)
         new_condition = updates.get("condition", card.condition)
         new_lang = updates.get("lang", card.lang)
+        new_set_code = updates.get("set_code", card.set_code) or ""
+        new_image_url = _normalize_image_url(updates.get("image_url", card.image_url))
 
         existing = db.scalars(
             select(Card).where(
@@ -159,6 +178,8 @@ def update_card(card_db_id: int, payload: CardUpdate, db: Session = Depends(get_
                 Card.rarity == new_rarity,
                 Card.condition == new_condition,
                 Card.lang == new_lang,
+                Card.set_code == new_set_code,
+                Card.image_url == new_image_url,
                 Card.id != card.id,
             )
         ).first()
@@ -174,6 +195,10 @@ def update_card(card_db_id: int, payload: CardUpdate, db: Session = Depends(get_
             return existing
 
     for field, value in updates.items():
+        if field == "set_code":
+            value = value or ""
+        elif field == "image_url":
+            value = _normalize_image_url(value)
         setattr(card, field, value)
     db.commit()
     db.refresh(card)
@@ -203,13 +228,18 @@ def split_card(card_db_id: int, payload: CardSplit, db: Session = Depends(get_db
     new_lang = payload.lang if payload.lang is not None else source.lang
     new_location = payload.location if payload.location is not None else source.location
     new_set_code = payload.set_code if payload.set_code is not None else source.set_code
+    new_set_code = new_set_code or ""
+    new_image_url = _normalize_image_url(
+        payload.image_url if payload.image_url is not None else source.image_url
+    )
 
     # Check if the split would create an identical card
     if (new_rarity == source.rarity and new_condition == source.condition
-            and new_lang == source.lang and new_set_code == source.set_code):
+            and new_lang == source.lang and new_set_code == source.set_code
+            and new_image_url == source.image_url):
         raise HTTPException(
             status_code=400,
-            detail="Devi cambiare almeno un attributo (rarità, condizione o lingua)",
+            detail="Devi cambiare almeno un attributo (rarità, condizione, lingua o artwork)",
         )
 
     # Decrement source
@@ -223,6 +253,8 @@ def split_card(card_db_id: int, payload: CardSplit, db: Session = Depends(get_db
             Card.condition == new_condition,
             Card.lang == new_lang,
             Card.set_code == new_set_code,
+            Card.image_url == new_image_url,
+            Card.id != source.id,
         )
     ).first()
 
@@ -245,7 +277,7 @@ def split_card(card_db_id: int, payload: CardSplit, db: Session = Depends(get_db
             race=source.race,
             attribute=source.attribute,
             archetype=source.archetype,
-            image_url=source.image_url,
+            image_url=new_image_url,
             price_cardmarket=source.price_cardmarket,
             price_tcgplayer=source.price_tcgplayer,
             quantity=payload.quantity,
@@ -266,78 +298,6 @@ def split_card(card_db_id: int, payload: CardSplit, db: Session = Depends(get_db
         db.commit()
 
     return result
-
-
-@router.post("/refresh-prices")
-async def refresh_all_prices(db: Session = Depends(get_db)):
-    """Refresh prices for all cards from YGOProDeck. Rate-limited to 10 req/s.
-
-    Uses set-specific price (set_price) when available for the card's rarity,
-    otherwise falls back to the generic cardmarket_price.
-    """
-    import asyncio
-    import time
-
-    cards = db.scalars(select(Card)).all()
-    # Deduplicate by card_id
-    unique_ids = list({c.card_id: c for c in cards}.keys())
-
-    updated = 0
-    failed = 0
-    total = len(unique_ids)
-    interval = 1.0 / 10  # 10 requests per second
-
-    async with httpx.AsyncClient(timeout=10) as client:
-        for i, card_id in enumerate(unique_ids):
-            t0 = time.monotonic()
-            try:
-                resp = await client.get(YGOPRODECK_API, params={"id": card_id})
-                if resp.status_code == 200:
-                    data = resp.json().get("data", [])
-                    if data:
-                        api_card = data[0]
-                        generic_prices = api_card.get("card_prices", [{}])[0]
-                        generic_cm = _safe_float(generic_prices.get("cardmarket_price"))
-                        generic_tcp = _safe_float(generic_prices.get("tcgplayer_price"))
-
-                        # Build lookups by rarity: price and set_code
-                        set_prices = {}
-                        set_codes = {}
-                        for s in api_card.get("card_sets", []):
-                            r = s.get("set_rarity", "")
-                            sp = _safe_float(s.get("set_price"))
-                            if sp and r not in set_prices:
-                                set_prices[r] = sp
-                            if r not in set_codes and s.get("set_code"):
-                                set_codes[r] = s["set_code"]
-
-                        for card in cards:
-                            if card.card_id == card_id:
-                                # Prefer set-specific price for this card's rarity
-                                specific = set_prices.get(card.rarity)
-                                card.price_cardmarket = specific if specific else generic_cm
-                                if generic_tcp is not None:
-                                    card.price_tcgplayer = generic_tcp
-                                # Backfill set_code if missing
-                                if not card.set_code:
-                                    card.set_code = set_codes.get(card.rarity)
-                        updated += 1
-                else:
-                    failed += 1
-            except Exception:
-                failed += 1
-
-            # Rate limiting
-            elapsed = time.monotonic() - t0
-            if elapsed < interval:
-                await asyncio.sleep(interval - elapsed)
-
-            # Commit every 50 cards
-            if (i + 1) % 50 == 0:
-                db.commit()
-
-    db.commit()
-    return {"updated": updated, "failed": failed, "total": total}
 
 
 @router.delete("/{card_db_id}", status_code=204)
