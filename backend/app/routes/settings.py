@@ -1,12 +1,16 @@
 import json
+import threading
 from pathlib import Path
 
 from fastapi import APIRouter
 from pydantic import BaseModel
 
+from ..paths import DATA_DIR
+
 router = APIRouter(prefix="/api/settings", tags=["settings"])
 
-SETTINGS_FILE = Path(__file__).resolve().parent.parent.parent / "settings.json"
+SETTINGS_FILE = DATA_DIR.parent / "settings.json"
+_lock = threading.Lock()
 
 
 def _load() -> dict:
@@ -28,9 +32,10 @@ def get_settings():
 @router.put("")
 def update_settings(payload: dict):
     """Update user settings (merges with existing)."""
-    current = _load()
-    current.update(payload)
-    _save(current)
+    with _lock:
+        current = _load()
+        current.update(payload)
+        _save(current)
     return current
 
 
@@ -44,7 +49,8 @@ def get_setting(key: str):
 @router.put("/{key}")
 def update_setting(key: str, payload: dict):
     """Update a single setting."""
-    data = _load()
-    data[key] = payload.get("value")
-    _save(data)
+    with _lock:
+        data = _load()
+        data[key] = payload.get("value")
+        _save(data)
     return {"key": key, "value": data[key]}

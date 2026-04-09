@@ -79,7 +79,10 @@ const settings = useSettingsStore()
 
 const loading = ref(false)
 const searchQuery = ref('')
-const sortBy = ref(localStorage.getItem('yugipy_collection_sort') || 'price-desc')
+const sortBy = computed({
+  get: () => settings.collectionSort,
+  set: (val) => settings.setCollectionSort(val)
+})
 const filterRef = ref(null)
 const localFilters = ref({})
 

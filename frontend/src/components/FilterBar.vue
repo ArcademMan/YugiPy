@@ -1,6 +1,6 @@
 <template>
   <div class="filter-bar">
-    <select v-model="sortBy" @change="onSortChange">
+    <select v-model="sortBy">
       <option value="price-desc">Price &#x2193;</option>
       <option value="price-asc">Price &#x2191;</option>
       <option value="name-asc">Name A-Z</option>
@@ -55,7 +55,7 @@ const props = defineProps({
 
 const emit = defineEmits(['server-filter-change', 'update:filters'])
 
-const sortBy = defineModel('sort', { default: localStorage.getItem('yugipy_collection_sort') || 'price-desc' })
+const sortBy = defineModel('sort', { default: 'price-desc' })
 
 const filters = reactive({
   rarity: '',
@@ -67,10 +67,6 @@ const filters = reactive({
   level: '',
   location: ''
 })
-
-function onSortChange() {
-  localStorage.setItem('yugipy_collection_sort', sortBy.value)
-}
 
 function onServerFilterChange() {
   emit('server-filter-change')

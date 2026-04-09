@@ -5,7 +5,7 @@
     </div>
 
     <div id="camera-container" ref="cameraContainer">
-      <video ref="videoEl" autoplay playsinline></video>
+      <video id="camera-feed" ref="videoEl" autoplay playsinline></video>
       <div id="camera-overlay"><div class="card-guide" ref="guideEl"></div></div>
     </div>
 

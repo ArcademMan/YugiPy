@@ -23,8 +23,9 @@ def get_stats(db: Session = Depends(get_db)):
     total_copies = sum(c.quantity for c in cards)
     distinct_card_ids = len({c.card_id for c in cards})
 
-    # --- Price helpers (respect priceDisplay setting) ---
-    price_mode = load_settings().get("priceDisplay", "cm_median")
+    # --- Price helpers (respect price_display setting) ---
+    _settings = load_settings()
+    price_mode = _settings.get("price_display") or _settings.get("priceDisplay", "cm_median")
 
     def best_price(c):
         if price_mode == "trend":
