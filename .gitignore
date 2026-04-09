@@ -135,3 +135,4 @@ htmlcov/
 yugipy-price-sync.zip
 backend/train_clip.py
 _debug_query_artwork.jpg
+/frontend/public/flags

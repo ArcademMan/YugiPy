@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from .models import Card
 
-_MAPS_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "js"
+_MAPS_DIR = Path(__file__).resolve().parent.parent.parent / "frontend" / "src" / "data"
 
 _expansions: dict[str, int] = {}
 _rarities: dict[str, int] = {}

@@ -103,6 +103,18 @@ def get_stats(db: Session = Depends(get_db)):
     avg_by_rarity = {k: round(value_by_rarity[k] / count_by_rarity[k], 2) if count_by_rarity[k] else 0 for k in value_by_rarity}
     avg_by_rarity = dict(sorted(avg_by_rarity.items(), key=lambda x: x[1], reverse=True))
 
+    # --- Value by set ---
+    value_by_set = Counter()
+    count_by_set = Counter()
+    for c in cards:
+        if c.set_code:
+            prefix = c.set_code.split("-")[0]
+            value_by_set[prefix] += best_price(c) * c.quantity
+            count_by_set[prefix] += c.quantity
+    value_by_set_sorted = value_by_set.most_common(20)
+    value_by_set = {k: round(v, 2) for k, v in value_by_set_sorted}
+    count_by_set = {k: count_by_set[k] for k, _ in value_by_set_sorted}
+
     # --- Value by language ---
     value_by_lang = Counter()
     for c in cards:
@@ -185,6 +197,8 @@ def get_stats(db: Session = Depends(get_db)):
         "value_by_rarity": value_by_rarity,
         "count_by_rarity": count_by_rarity,
         "avg_by_rarity": avg_by_rarity,
+        "value_by_set": value_by_set,
+        "count_by_set": count_by_set,
         "value_by_lang": value_by_lang,
         "price_distribution": price_ranges,
         "atk_def_scatter": atk_def_data,
