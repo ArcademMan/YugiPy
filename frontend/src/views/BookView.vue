@@ -1,19 +1,27 @@
 <template>
   <section>
     <div class="page-header">
-      <h1>Book</h1>
-      <span class="stats-badge">{{ statsText }}</span>
+      <div style="display:flex;align-items:center;gap:8px">
+        <h1>Book</h1>
+        <span class="stats-badge">{{ statsText }}</span>
+      </div>
+      <button class="btn-secondary" @click="settingsVisible = true" title="Settings">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-4 0v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83-2.83l.06-.06A1.65 1.65 0 004.68 15a1.65 1.65 0 00-1.51-1H3a2 2 0 010-4h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 012.83-2.83l.06.06A1.65 1.65 0 009 4.68a1.65 1.65 0 001-1.51V3a2 2 0 014 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 2.83l-.06.06A1.65 1.65 0 0019.4 9a1.65 1.65 0 001.51 1H21a2 2 0 010 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+      </button>
     </div>
 
-    <div class="book-layout">
-      <BookSettingsPanel
-        :availableSets="availableSets"
-        :initialPrefs="savedPrefs"
-        :initialSortRules="savedSortRules"
-        ref="settingsPanel"
-        @change="onSettingsChange"
-      />
+    <BookSettingsPanel
+      :visible="settingsVisible"
+      :availableSets="availableSets"
+      :availableArchetypes="availableArchetypes"
+      :initialPrefs="savedPrefs"
+      :initialSortRules="savedSortRules"
+      ref="settingsPanel"
+      @change="onSettingsChange"
+      @close="settingsVisible = false"
+    />
 
+    <div class="book-layout">
       <div class="book-main">
         <div class="book-spread" v-html="spreadHtml"></div>
         <div class="book-nav">
@@ -57,6 +65,7 @@ import api from '../api.js'
 const store = useCollectionStore()
 const settings = useSettingsStore()
 
+const settingsVisible = ref(false)
 const settingsPanel = ref(null)
 const currentSpread = ref(0)
 const bookPages = ref([])
@@ -74,6 +83,10 @@ const savedSortRules = computed(() => settings.settings.bookSortRules || null)
 
 const availableSets = computed(() =>
   [...new Set(store.allCards.map(c => c.set_code ? c.set_code.split('-')[0] : '').filter(Boolean))].sort()
+)
+
+const availableArchetypes = computed(() =>
+  [...new Set(store.allCards.map(c => c.archetype).filter(Boolean))].sort()
 )
 
 const statsText = computed(() => {
@@ -122,17 +135,20 @@ function buildBookPages(prefs, sortRulesArr) {
   const maxCopies = parseInt(prefs.maxCopies) || 0
   const filterLangs = prefs.filterLangs || []
   const filterConditions = prefs.filterConditions || []
+  const filterArchetypes = prefs.filterArchetypes || []
   const filterSets = prefs.filterSets || []
   const minPrice = parseFloat(prefs.minPrice) || 0
   const copiesMode = prefs.copiesMode || 'entry'
 
   const langSet = filterLangs.length > 0 ? new Set(filterLangs) : null
   const condSet = filterConditions.length > 0 ? new Set(filterConditions) : null
+  const archSet = filterArchetypes.length > 0 ? new Set(filterArchetypes) : null
   const setList = filterSets.length > 0 ? filterSets : null
 
   let filtered = store.allCards.filter(card => {
     if (langSet && !langSet.has(card.lang)) return false
     if (condSet && !condSet.has(card.condition)) return false
+    if (archSet && !archSet.has(card.archetype)) return false
     if (setList && !setList.some(s => (card.set_code || '').startsWith(s))) return false
     if (minPrice > 0 && (getDisplayPrice(card, settings.priceDisplayMode).price || 0) < minPrice) return false
     return true
@@ -183,6 +199,17 @@ function buildBookPages(prefs, sortRulesArr) {
     name_asc: (a, b) => a.name.localeCompare(b.name),
     name_desc: (a, b) => b.name.localeCompare(a.name),
     type_asc: (a, b) => (TYPE_ORDER[TYPE_GROUP[a.type] || a.type] ?? 99) - (TYPE_ORDER[TYPE_GROUP[b.type] || b.type] ?? 99),
+    type_desc: (a, b) => (TYPE_ORDER[TYPE_GROUP[b.type] || b.type] ?? 99) - (TYPE_ORDER[TYPE_GROUP[a.type] || a.type] ?? 99),
+    type_creature_asc: (a, b) => {
+      const ga = TYPE_GROUP[a.type] || a.type, gb = TYPE_GROUP[b.type] || b.type
+      if (['Spell', 'Trap', 'Token'].includes(ga) || ['Spell', 'Trap', 'Token'].includes(gb)) return 0
+      return (TYPE_ORDER[ga] ?? 99) - (TYPE_ORDER[gb] ?? 99)
+    },
+    type_creature_desc: (a, b) => {
+      const ga = TYPE_GROUP[a.type] || a.type, gb = TYPE_GROUP[b.type] || b.type
+      if (['Spell', 'Trap', 'Token'].includes(ga) || ['Spell', 'Trap', 'Token'].includes(gb)) return 0
+      return (TYPE_ORDER[gb] ?? 99) - (TYPE_ORDER[ga] ?? 99)
+    },
     level_desc: (a, b) => (b.level ?? 0) - (a.level ?? 0),
     level_asc: (a, b) => (a.level ?? 0) - (b.level ?? 0),
     set_code_asc: (a, b) => (a.set_code || '').localeCompare(b.set_code || ''),

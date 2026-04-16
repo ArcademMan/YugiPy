@@ -65,6 +65,8 @@ def run_migrations(engine: Engine) -> None:
             return  # create_all will handle it
 
         _ensure_columns(conn)
+        _ensure_books_columns(conn)
+        _migrate_book_slots(conn)
         _normalize_image_urls(conn)
 
         if _needs_constraint_rebuild(conn):
@@ -113,6 +115,43 @@ def _ensure_columns(conn: sqlite3.Connection) -> None:
         if col not in existing:
             log.info("Adding column cards.%s", col)
             conn.execute(f"ALTER TABLE cards ADD COLUMN {col} {definition}")
+
+
+def _ensure_books_columns(conn: sqlite3.Connection) -> None:
+    """Add any missing columns to the books table."""
+    if not _table_exists(conn, "books"):
+        return
+    existing = _get_column_names(conn, "books")
+    new_columns = {
+        "filter_archetypes": "JSON",
+        "group_duplicates": "INTEGER DEFAULT 0",
+    }
+    for col, definition in new_columns.items():
+        if col not in existing:
+            log.info("Adding column books.%s", col)
+            conn.execute(f"ALTER TABLE books ADD COLUMN {col} {definition}")
+
+
+def _migrate_book_slots(conn: sqlite3.Connection) -> None:
+    """Migrate book_slots from absolute (page, slot) to relative (group_key, position)."""
+    if not _table_exists(conn, "book_slots"):
+        return
+    cols = _get_column_names(conn, "book_slots")
+    if "group_key" in cols:
+        return  # already migrated
+    log.info("Migrating book_slots to group-relative positions")
+    conn.execute("DROP TABLE book_slots")
+    conn.execute("""
+        CREATE TABLE book_slots (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            book_id INTEGER NOT NULL REFERENCES books(id) ON DELETE CASCADE,
+            group_key VARCHAR(200) NOT NULL DEFAULT '',
+            position INTEGER NOT NULL,
+            card_id INTEGER NOT NULL REFERENCES cards(id) ON DELETE CASCADE,
+            UNIQUE(book_id, group_key, position),
+            UNIQUE(book_id, card_id)
+        )
+    """)
 
 
 def _normalize_image_urls(conn: sqlite3.Connection) -> None:

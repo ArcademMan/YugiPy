@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 
-from sqlalchemy import Integer, String, Text, Float, DateTime, JSON, UniqueConstraint
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Text, Float, DateTime, JSON, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .database import Base
@@ -54,3 +54,61 @@ class Card(Base):
         default=lambda: datetime.now(timezone.utc),
         onupdate=lambda: datetime.now(timezone.utc),
     )
+
+
+class Book(Base):
+    __tablename__ = "books"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    name: Mapped[str] = mapped_column(String(100))
+    grid_size: Mapped[str] = mapped_column(String(5), default="3x3")
+    page_count: Mapped[int] = mapped_column(Integer, default=20)
+    group_by: Mapped[str] = mapped_column(String(20), default="archetype")
+    new_page: Mapped[bool] = mapped_column(Boolean, default=True)
+    show_prices: Mapped[bool] = mapped_column(Boolean, default=False)
+    sort_rules: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    filter_langs: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    filter_conditions: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    filter_archetypes: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    filter_sets: Mapped[list | None] = mapped_column(JSON, nullable=True)
+    min_price: Mapped[float] = mapped_column(Float, default=0)
+    max_copies: Mapped[int] = mapped_column(Integer, default=0)
+    copies_mode: Mapped[str] = mapped_column(String(10), default="entry")
+    group_duplicates: Mapped[bool] = mapped_column(Boolean, default=False)
+
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime, default=lambda: datetime.now(timezone.utc)
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=lambda: datetime.now(timezone.utc),
+        onupdate=lambda: datetime.now(timezone.utc),
+    )
+
+
+class BookSlot(Base):
+    """Pinned card position within its group."""
+    __tablename__ = "book_slots"
+    __table_args__ = (
+        UniqueConstraint("book_id", "group_key", "position", name="uq_book_slot_pos"),
+        UniqueConstraint("book_id", "card_id", name="uq_book_slot_card"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    book_id: Mapped[int] = mapped_column(Integer, ForeignKey("books.id", ondelete="CASCADE"))
+    group_key: Mapped[str] = mapped_column(String(200), default="")
+    position: Mapped[int] = mapped_column(Integer)
+    card_id: Mapped[int] = mapped_column(Integer, ForeignKey("cards.id", ondelete="CASCADE"))
+
+
+class BookCard(Base):
+    """Card assigned/consumed by a book."""
+    __tablename__ = "book_cards"
+    __table_args__ = (
+        UniqueConstraint("book_id", "card_id", name="uq_book_card"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    book_id: Mapped[int] = mapped_column(Integer, ForeignKey("books.id", ondelete="CASCADE"))
+    card_id: Mapped[int] = mapped_column(Integer, ForeignKey("cards.id", ondelete="CASCADE"))
+    quantity: Mapped[int] = mapped_column(Integer, default=1)

@@ -15,7 +15,7 @@ const { toasts } = useToast()
 <style scoped>
 .toast-container {
   position: fixed;
-  bottom: 80px;
+  bottom: 90px;
   left: 50%;
   transform: translateX(-50%);
   z-index: 10000;
@@ -23,13 +23,7 @@ const { toasts } = useToast()
   flex-direction: column;
   gap: 8px;
   align-items: center;
-}
-
-@media (min-width: 768px) {
-  .toast-container {
-    top: 72px;
-    bottom: auto;
-  }
+  pointer-events: none;
 }
 
 .toast-enter-active {
@@ -40,6 +34,6 @@ const { toasts } = useToast()
 }
 .toast-leave-to {
   opacity: 0;
-  transform: translateY(-10px);
+  transform: translateY(10px);
 }
 </style>

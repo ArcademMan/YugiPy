@@ -44,9 +44,9 @@ const navItems = [
     icon: '<path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z"/><circle cx="12" cy="13" r="4"/>'
   },
   {
-    name: 'book',
-    to: '/book',
-    label: 'Book',
+    name: 'books',
+    to: '/books',
+    label: 'Books',
     icon: '<path d="M4 19.5A2.5 2.5 0 016.5 17H20"/><path d="M4 4.5A2.5 2.5 0 016.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15z"/>'
   },
   {

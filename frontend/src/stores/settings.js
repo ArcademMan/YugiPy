@@ -6,6 +6,7 @@ export const useSettingsStore = defineStore('settings', {
     settings: {},
     priceDisplayMode: 'cm_median',
     autoFetchPrices: true,
+    defaultLang: 'IT',
     lastCondition: 'Near Mint',
     lastLang: 'IT',
     collectionSort: 'price-desc',
@@ -20,6 +21,7 @@ export const useSettingsStore = defineStore('settings', {
         this.settings = data
         if (data.price_display) this.priceDisplayMode = data.price_display
         if (data.auto_fetch_prices !== undefined) this.autoFetchPrices = data.auto_fetch_prices
+        if (data.default_lang) this.defaultLang = data.default_lang
         if (data.last_condition) this.lastCondition = data.last_condition
         if (data.last_lang) this.lastLang = data.last_lang
         if (data.collection_sort) this.collectionSort = data.collection_sort
@@ -57,6 +59,11 @@ export const useSettingsStore = defineStore('settings', {
     setAutoFetchPrices(val) {
       this.autoFetchPrices = val
       this.saveSetting('auto_fetch_prices', val)
+    },
+
+    setDefaultLang(val) {
+      this.defaultLang = val
+      this.saveSetting('default_lang', val)
     },
 
     setLastCondition(val) {

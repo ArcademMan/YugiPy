@@ -187,7 +187,7 @@ function cropGuideRegion() {
 }
 
 async function startCamera() {
-  if (currentStream) return
+  if (currentStream) { startPreviewLoop(); return }
   try {
     currentStream = await navigator.mediaDevices.getUserMedia({
       video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 } }

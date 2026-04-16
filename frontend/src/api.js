@@ -3,6 +3,7 @@ const API = ''
 async function request(path, options = {}) {
   const res = await fetch(`${API}${path}`, options)
   if (!res.ok) throw new Error(`API error: ${res.status}`)
+  if (res.status === 204) return null
   return res.json()
 }
 
@@ -99,6 +100,56 @@ export default {
   },
   getBulkStatus() {
     return request('/api/cm-bulk/status')
+  },
+
+  // Books
+  getBooks() {
+    return request('/api/books')
+  },
+  getBook(id) {
+    return request(`/api/books/${id}`)
+  },
+  createBook(data) {
+    return post('/api/books', data)
+  },
+  updateBook(id, data) {
+    return put(`/api/books/${id}`, data)
+  },
+  deleteBook(id) {
+    return request(`/api/books/${id}`, { method: 'DELETE' })
+  },
+  getBookCards(bookId) {
+    return request(`/api/books/${bookId}/cards`)
+  },
+  assignCard(bookId, cardId, quantity = 1) {
+    return post(`/api/books/${bookId}/cards`, { card_id: cardId, quantity })
+  },
+  unassignCard(bookId, cardId) {
+    return request(`/api/books/${bookId}/cards/${cardId}`, { method: 'DELETE' })
+  },
+  autoAssign(bookId) {
+    return post(`/api/books/${bookId}/auto-assign`)
+  },
+  resetBook(bookId) {
+    return request(`/api/books/${bookId}/reset`, { method: 'DELETE' })
+  },
+  getBookSlots(bookId) {
+    return request(`/api/books/${bookId}/slots`)
+  },
+  setBookSlots(bookId, slots) {
+    return put(`/api/books/${bookId}/slots`, slots)
+  },
+  pinSlot(bookId, groupKey, position, cardId) {
+    return post(`/api/books/${bookId}/slots`, { group_key: groupKey, position, card_id: cardId })
+  },
+  unpinSlot(bookId, slotId) {
+    return request(`/api/books/${bookId}/slots/${slotId}`, { method: 'DELETE' })
+  },
+  getUnassignedCards() {
+    return request('/api/books/unassigned')
+  },
+  getArchetypeAvailability(bookId) {
+    return request(`/api/books/${bookId}/archetype-availability`)
   },
 
   // Storage

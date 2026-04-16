@@ -5,10 +5,19 @@
       <span class="multi-select-arrow">&#9662;</span>
     </button>
     <div v-if="open" class="multi-select-dropdown">
-      <label v-for="opt in options" :key="opt.value" class="multi-select-option">
-        <input type="checkbox" :value="opt.value" v-model="selected" @change="emitChange">
-        {{ opt.label }}
-      </label>
+      <template v-for="opt in visibleOptions" :key="opt.value">
+        <label class="multi-select-option" :class="{ disabled: opt.disabled }">
+          <input
+            type="checkbox"
+            :value="opt.value"
+            v-model="selected"
+            :disabled="opt.disabled"
+            @change="emitChange"
+          >
+          <span>{{ opt.label }}</span>
+          <span v-if="opt.count != null" class="multi-select-count">({{ opt.count }})</span>
+        </label>
+      </template>
     </div>
   </div>
 </template>
@@ -19,7 +28,8 @@ import { ref, computed, watch, onMounted, onBeforeUnmount } from 'vue'
 const props = defineProps({
   options: { type: Array, required: true },
   modelValue: { type: Array, default: () => [] },
-  placeholder: { type: String, default: 'All' }
+  placeholder: { type: String, default: 'All' },
+  hideDisabled: { type: Boolean, default: false }
 })
 
 const emit = defineEmits(['update:modelValue'])
@@ -29,6 +39,11 @@ const root = ref(null)
 const selected = ref([...props.modelValue])
 
 watch(() => props.modelValue, (v) => { selected.value = [...v] })
+
+const visibleOptions = computed(() => {
+  if (!props.hideDisabled) return props.options
+  return props.options.filter(o => !o.disabled || selected.value.includes(o.value))
+})
 
 const displayLabel = computed(() => {
   if (selected.value.length === 0) return props.placeholder

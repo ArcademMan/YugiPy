@@ -32,6 +32,7 @@ export const LANG_OPTIONS = [
 ]
 
 export const CONDITION_OPTIONS = [
+  { value: "N/A", label: "N/A" },
   { value: "Mint", label: "Mint" },
   { value: "Near Mint", label: "Near Mint" },
   { value: "Excellent", label: "Excellent" },

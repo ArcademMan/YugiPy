@@ -19,7 +19,7 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from .database import Base, engine
-from .routes import cards, cardmarket, scan, settings, setup, stats, storage
+from .routes import books, cards, cardmarket, scan, settings, setup, stats, storage
 
 # Auto-migrate existing DBs, then create_all for brand-new ones.
 from . import models  # noqa: ensure models are registered
@@ -48,6 +48,7 @@ app.add_middleware(
 )
 
 app.include_router(scan.router)
+app.include_router(books.router)
 app.include_router(cards.router)
 app.include_router(cardmarket.router)
 app.include_router(settings.router)

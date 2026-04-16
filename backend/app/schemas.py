@@ -87,3 +87,97 @@ class ScanCandidate(CardBase):
 class ScanResult(BaseModel):
     extracted_text: str
     candidates: list[ScanCandidate]
+
+
+# ── Books ──────────────────────────────────────────────────────────────
+
+
+class BookCreate(BaseModel):
+    name: str
+    grid_size: str = "3x3"
+    page_count: int = 20
+    group_by: str = "archetype"
+    new_page: bool = True
+    show_prices: bool = False
+    group_duplicates: bool = False
+    sort_rules: list[str] | None = None
+    filter_langs: list[str] | None = None
+    filter_conditions: list[str] | None = None
+    filter_archetypes: list[str] | None = None
+    filter_sets: list[str] | None = None
+    min_price: float = 0
+    max_copies: int = 0
+    copies_mode: str = "entry"
+
+
+class BookUpdate(BaseModel):
+    name: str | None = None
+    grid_size: str | None = None
+    page_count: int | None = None
+    group_by: str | None = None
+    new_page: bool | None = None
+    show_prices: bool | None = None
+    group_duplicates: bool | None = None
+    sort_rules: list[str] | None = None
+    filter_langs: list[str] | None = None
+    filter_conditions: list[str] | None = None
+    filter_archetypes: list[str] | None = None
+    filter_sets: list[str] | None = None
+    min_price: float | None = None
+    max_copies: int | None = None
+    copies_mode: str | None = None
+
+
+class BookResponse(BaseModel):
+    id: int
+    name: str
+    grid_size: str
+    page_count: int
+    group_by: str
+    new_page: bool
+    show_prices: bool
+    group_duplicates: bool
+    sort_rules: list[str] | None = None
+    filter_langs: list[str] | None = None
+    filter_conditions: list[str] | None = None
+    filter_archetypes: list[str] | None = None
+    filter_sets: list[str] | None = None
+    min_price: float
+    max_copies: int
+    copies_mode: str
+    total_slots: int = 0
+    assigned_cards: int = 0
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BookSlotCreate(BaseModel):
+    group_key: str = ""
+    position: int
+    card_id: int
+
+
+class BookSlotResponse(BaseModel):
+    id: int
+    book_id: int
+    group_key: str
+    position: int
+    card_id: int
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class BookCardCreate(BaseModel):
+    card_id: int
+    quantity: int = 1
+
+
+class BookCardResponse(BaseModel):
+    id: int
+    book_id: int
+    card_id: int
+    quantity: int
+
+    model_config = ConfigDict(from_attributes=True)

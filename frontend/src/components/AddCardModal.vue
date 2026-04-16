@@ -82,7 +82,6 @@
 import { ref, computed, watch } from 'vue'
 import { RARITY_OPTIONS, CONDITION_OPTIONS, LANG_OPTIONS } from '../utils/constants.js'
 import { cardImgUrl } from '../utils/images.js'
-import { detectLangFromSetCode } from '../utils/images.js'
 import { useSettingsStore } from '../stores/settings.js'
 import { useToast } from '../composables/useToast.js'
 import LangFlag from './LangFlag.vue'
@@ -98,6 +97,9 @@ const emit = defineEmits(['close', 'added'])
 const settings = useSettingsStore()
 const { showToast } = useToast()
 
+// Remember last set code used across scans (session only)
+let lastSetCode = ''
+
 const fallbackSet = { set_code: 'N/A', set_rarity: 'Common', set_name: 'Unknown', set_price: null }
 const customSetMarker = { set_code: '__other__', set_rarity: '', set_name: 'Other', set_price: null }
 const sortedSets = computed(() => [...props.sets].sort((a, b) => (a.set_code || '').localeCompare(b.set_code || '')))
@@ -106,7 +108,7 @@ const showCustomSetCode = ref(false)
 const customSetCode = ref('')
 const rarity = ref('Common')
 const condition = ref(settings.lastCondition)
-const lang = ref(settings.lastLang)
+const lang = ref(settings.lastLang || settings.defaultLang)
 const qty = ref(1)
 const location = ref('')
 
@@ -146,13 +148,14 @@ function syncRarity() {
 
 watch(() => props.visible, async (val) => {
   if (!val || !props.cardData) return
-  selectedSet.value = sortedSets.value[0] || fallbackSet
+  // Try to auto-select last used set prefix (e.g. "BLMR" from "BLMR-IT065")
+  const lastPrefix = lastSetCode ? lastSetCode.split('-')[0] : ''
+  const lastMatch = lastPrefix ? sortedSets.value.find(s => s.set_code && s.set_code.split('-')[0] === lastPrefix) : null
+  selectedSet.value = lastMatch || sortedSets.value[0] || fallbackSet
   syncRarity()
   showCustomSetCode.value = false
   customSetCode.value = ''
-  const detectedLang = props.sets.length ? detectLangFromSetCode(props.sets[0]?.set_code) : null
-  if (detectedLang) lang.value = detectedLang
-  else lang.value = settings.lastLang
+  lang.value = settings.lastLang || settings.defaultLang
   condition.value = settings.lastCondition
   qty.value = 1
   location.value = ''
@@ -208,6 +211,7 @@ async function confirm() {
     await api.addCard(payload)
     settings.setLastLang(lang.value)
     settings.setLastCondition(condition.value)
+    lastSetCode = setCode || ''
     showToast('Card added to collection!')
     emit('added')
     emit('close')

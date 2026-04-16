@@ -1,7 +1,7 @@
 const WS_URL = "ws://127.0.0.1:8001";
 const RECONNECT_DELAY = 3000;
 const CONNECT_TIMEOUT = 5000;
-const SCRAPE_TIMEOUT = 20000;
+const SCRAPE_TIMEOUT = 30000;
 const PING_INTERVAL = 10000; // heartbeat every 10s to detect dead connections
 
 let ws = null;

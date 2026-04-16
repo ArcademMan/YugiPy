@@ -28,6 +28,21 @@
       </div>
     </div>
 
+    <!-- Defaults -->
+    <div class="settings-card">
+      <div class="settings-card-header">
+        <h3>Defaults</h3>
+      </div>
+      <div class="settings-card-body">
+        <div class="form-group" style="margin-bottom:12px">
+          <label>Default language for new cards</label>
+          <select v-model="defaultLang" @change="onDefaultLangChange">
+            <option v-for="l in LANG_OPTIONS" :key="l.value" :value="l.value">{{ l.label }}</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
     <!-- Image Download -->
     <div class="settings-card">
       <div class="settings-card-header">
@@ -107,6 +122,7 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import { useSettingsStore } from '../stores/settings.js'
+import { LANG_OPTIONS } from '../utils/constants.js'
 import { useToast } from '../composables/useToast.js'
 import api from '../api.js'
 
@@ -117,11 +133,17 @@ const { showToast } = useToast()
 const priceDisplay = ref(settings.priceDisplayMode)
 const autoFetch = ref(settings.autoFetchPrices)
 
+// Defaults
+const defaultLang = ref(settings.defaultLang)
+
 function onPriceDisplayChange() {
   settings.setPriceDisplayMode(priceDisplay.value)
 }
 function onAutoFetchChange() {
   settings.setAutoFetchPrices(autoFetch.value)
+}
+function onDefaultLangChange() {
+  settings.setDefaultLang(defaultLang.value)
 }
 
 // Image download
