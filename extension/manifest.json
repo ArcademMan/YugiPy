@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "YugiPy Price Sync",
-  "version": "1.4",
+  "version": "1.5",
   "description": "Syncs Yu-Gi-Oh card prices from Cardmarket to YugiPy.",
   "permissions": [
     "tabs",
@@ -11,6 +11,7 @@
     "*://www.cardmarket.com/*"
   ],
   "background": {
+    "scripts": ["background.js"],
     "service_worker": "background.js"
   },
   "content_scripts": [
